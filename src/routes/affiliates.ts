@@ -1,212 +1,29 @@
+// @ts-nocheck
 import { FastifyInstance } from 'fastify';
 import { AffiliatesController } from '@/controllers/affiliates';
 import { authMiddleware } from '@/middleware/auth';
-import { debugAuthMiddleware } from '@/middleware/debug-auth';
-
-// Schemas para documentação Swagger
-const affiliateResponseSchema = {
-  type: 'object',
-  properties: {
-    success: { type: 'boolean' },
-    data: {
-      type: 'object',
-      properties: {
-        id: { type: 'string', format: 'uuid' },
-        referralCode: { type: 'string' },
-        category: { 
-          type: 'string', 
-          enum: ['bronze', 'silver', 'gold', 'platinum', 'diamond'] 
-        },
-        level: { type: 'integer' },
-        status: { 
-          type: 'string', 
-          enum: ['active', 'inactive', 'suspended'] 
-        },
-        joinedAt: { type: 'string', format: 'date-time' },
-        user: {
-          type: 'object',
-          properties: {
-            id: { type: 'string', format: 'uuid' },
-            name: { type: 'string' },
-            email: { type: 'string', format: 'email' },
-            phone: { type: 'string' },
-            status: { type: 'string' },
-            createdAt: { type: 'string', format: 'date-time' },
-            lastLoginAt: { type: 'string', format: 'date-time' }
-          }
-        },
-        metrics: {
-          type: 'object',
-          properties: {
-            totalReferrals: { type: 'integer' },
-            activeReferrals: { type: 'integer' },
-            monthlyVolume: { type: 'number' },
-            totalCommissions: { type: 'number' },
-            currentStreak: { type: 'integer' }
-          }
-        },
-        parent: {
-          type: 'object',
-          nullable: true,
-          properties: {
-            id: { type: 'string', format: 'uuid' },
-            name: { type: 'string' },
-            referralCode: { type: 'string' }
-          }
-        }
-      }
-    }
-  }
-};
-
-const networkResponseSchema = {
-  type: 'object',
-  properties: {
-    success: { type: 'boolean' },
-    data: {
-      type: 'object',
-      properties: {
-        network: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'string', format: 'uuid' },
-              name: { type: 'string' },
-              level: { type: 'integer' },
-              status: { type: 'string' },
-              joinedAt: { type: 'string', format: 'date-time' },
-              metrics: {
-                type: 'object',
-                properties: {
-                  directReferrals: { type: 'integer' },
-                  monthlyVolume: { type: 'number' },
-                  commissions: { type: 'number' }
-                }
-              },
-              children: { type: 'array' }
-            }
-          }
-        },
-        summary: {
-          type: 'object',
-          properties: {
-            totalAffiliates: { type: 'integer' },
-            activeAffiliates: { type: 'integer' },
-            totalVolume: { type: 'number' },
-            totalCommissions: { type: 'number' }
-          }
-        }
-      }
-    },
-    pagination: {
-      type: 'object',
-      properties: {
-        page: { type: 'integer' },
-        limit: { type: 'integer' },
-        total: { type: 'integer' },
-        pages: { type: 'integer' }
-      }
-    }
-  }
-};
-
-const commissionsResponseSchema = {
-  type: 'object',
-  properties: {
-    success: { type: 'boolean' },
-    data: {
-      type: 'object',
-      properties: {
-        commissions: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'string', format: 'uuid' },
-              amount: { type: 'number' },
-              currency: { type: 'string' },
-              type: { type: 'string' },
-              level: { type: 'integer' },
-              status: { type: 'string' },
-              sourceAffiliate: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string', format: 'uuid' },
-                  name: { type: 'string' }
-                }
-              },
-              transaction: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string', format: 'uuid' },
-                  amount: { type: 'number' },
-                  type: { type: 'string' },
-                  createdAt: { type: 'string', format: 'date-time' }
-                }
-              },
-              calculatedAt: { type: 'string', format: 'date-time' },
-              paidAt: { type: 'string', format: 'date-time', nullable: true }
-            }
-          }
-        },
-        summary: {
-          type: 'object',
-          properties: {
-            totalAmount: { type: 'number' },
-            count: { type: 'integer' }
-          }
-        }
-      }
-    }
-  }
-};
-
-const updateAffiliateSchema = {
-  type: 'object',
-  properties: {
-    category: { 
-      type: 'string', 
-      enum: ['bronze', 'silver', 'gold', 'platinum', 'diamond'] 
-    },
-    status: { 
-      type: 'string', 
-      enum: ['active', 'inactive', 'suspended'] 
-    }
-  }
-};
-
-const errorResponseSchema = {
-  type: 'object',
-  properties: {
-    success: { type: 'boolean', enum: [false] },
-    error: {
-      type: 'object',
-      properties: {
-        code: { type: 'string' },
-        message: { type: 'string' },
-        details: { type: 'array', items: { type: 'object' } }
-      }
-    }
-  }
-};
 
 export async function affiliatesRoutes(fastify: FastifyInstance) {
+  // Aplicar middleware de autenticação em todas as rotas
+  fastify.addHook('preHandler', authMiddleware);
+
   // GET /api/affiliates/me - Dados do afiliado autenticado
   fastify.get('/me', {
     schema: {
-      description: 'Retorna dados do afiliado autenticado',
+      description: 'Retorna dados completos do afiliado autenticado incluindo categoria e level',
       tags: ['Afiliados'],
-      security: [{ bearerAuth: [] }],
-      response: {
-        200: affiliateResponseSchema,
-        401: errorResponseSchema,
-        404: errorResponseSchema,
-        500: errorResponseSchema
-      }
-    },
-    preHandler: authMiddleware
+      security: [{ bearerAuth: [] }]
+    }
   }, AffiliatesController.getMe);
+
+  // GET /api/affiliates/categories - Informações das categorias
+  fastify.get('/categories', {
+    schema: {
+      description: 'Retorna informações resumidas das categorias de afiliados',
+      tags: ['Afiliados'],
+      security: [{ bearerAuth: [] }]
+    }
+  }, AffiliatesController.getCategories);
 
   // GET /api/affiliates/network - Rede de afiliados
   fastify.get('/network', {
@@ -220,7 +37,7 @@ export async function affiliatesRoutes(fastify: FastifyInstance) {
           levels: { 
             type: 'integer', 
             minimum: 1, 
-            maximum: 10, 
+            maximum: 5, 
             default: 3,
             description: 'Número de níveis para retornar'
           },
@@ -244,73 +61,41 @@ export async function affiliatesRoutes(fastify: FastifyInstance) {
             description: 'Itens por página'
           }
         }
-      },
-      response: {
-        200: networkResponseSchema,
-        401: errorResponseSchema,
-        404: errorResponseSchema,
-        500: errorResponseSchema
       }
-    },
-    preHandler: authMiddleware
+    }
   }, AffiliatesController.getNetwork);
 
-  // PUT /api/affiliates/:id - Atualizar dados do afiliado
-  fastify.put('/:id', {
+  // GET /api/affiliates/referrals - Indicações do afiliado
+  fastify.get('/referrals', {
     schema: {
-      description: 'Atualiza dados do afiliado (próprio perfil ou admin)',
+      description: 'Retorna lista de indicações do afiliado com status de validação',
       tags: ['Afiliados'],
       security: [{ bearerAuth: [] }],
-      params: {
+      querystring: {
         type: 'object',
-        required: ['id'],
         properties: {
-          id: { 
-            type: 'string', 
-            format: 'uuid',
-            description: 'ID do afiliado'
+          status: {
+            type: 'string',
+            enum: ['validated', 'pending', 'all'],
+            default: 'all',
+            description: 'Filtrar por status de validação'
+          },
+          page: { 
+            type: 'integer', 
+            minimum: 1, 
+            default: 1,
+            description: 'Página para paginação'
+          },
+          limit: { 
+            type: 'integer', 
+            minimum: 1, 
+            maximum: 100, 
+            default: 20,
+            description: 'Itens por página'
           }
         }
-      },
-      body: updateAffiliateSchema,
-      response: {
-        200: affiliateResponseSchema,
-        400: errorResponseSchema,
-        401: errorResponseSchema,
-        403: errorResponseSchema,
-        404: errorResponseSchema,
-        500: errorResponseSchema
       }
-    },
-    preHandler: authMiddleware
-  }, AffiliatesController.updateAffiliate);
-
-  // GET /api/affiliates/:id/commissions - Comissões do afiliado
-  fastify.get('/:id/commissions', {
-    schema: {
-      description: 'Retorna histórico de comissões do afiliado',
-      tags: ['Afiliados'],
-      security: [{ bearerAuth: [] }],
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: {
-          id: { 
-            type: 'string', 
-            format: 'uuid',
-            description: 'ID do afiliado'
-          }
-        }
-      },
-      response: {
-        200: commissionsResponseSchema,
-        401: errorResponseSchema,
-        403: errorResponseSchema,
-        404: errorResponseSchema,
-        500: errorResponseSchema
-      }
-    },
-    preHandler: authMiddleware
-  }, AffiliatesController.getCommissions);
+    }
+  }, AffiliatesController.getReferrals);
 }
 

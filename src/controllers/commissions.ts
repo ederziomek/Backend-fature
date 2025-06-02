@@ -1,13 +1,15 @@
 // @ts-nocheck
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '@/config/database';
-import { CommissionStatus, AffiliateCategory } from '@prisma/client';
+import { CommissionStatus, CommissionType, CpaValidationModel } from '@prisma/client';
+import { CommissionService } from '@/services/commission';
 
 interface CreateCommissionBody {
-  transactionId: string;
+  transactionId?: string;
   affiliateId: string;
+  type: CommissionType;
   level: number;
-  percentage: number;
+  percentage?: number;
   amount: number;
   metadata?: any;
 }
@@ -19,6 +21,7 @@ interface UpdateCommissionBody {
 
 interface CommissionFilters {
   status?: CommissionStatus;
+  type?: CommissionType;
   level?: number;
   dateFrom?: string;
   dateTo?: string;
@@ -44,45 +47,17 @@ interface ListCommissionsRequest extends FastifyRequest {
   Querystring: CommissionFilters;
 }
 
-interface CalculateCommissionsRequest extends FastifyRequest {
+interface CalculateRevShareRequest extends FastifyRequest {
   Body: { transactionId: string };
 }
 
-interface PayCommissionRequest extends FastifyRequest {
-  Params: { id: string };
+interface ProcessCpaRequest extends FastifyRequest {
+  Body: { referralId: string };
 }
 
-// Configuração de percentuais por categoria e nível
-const COMMISSION_CONFIG = {
-  standard: {
-    1: 0.05, // 5% nível 1
-    2: 0.03, // 3% nível 2
-    3: 0.02, // 2% nível 3
-    4: 0.01, // 1% nível 4
-    5: 0.005 // 0.5% nível 5
-  },
-  premium: {
-    1: 0.07, // 7% nível 1
-    2: 0.05, // 5% nível 2
-    3: 0.03, // 3% nível 3
-    4: 0.02, // 2% nível 4
-    5: 0.01  // 1% nível 5
-  },
-  vip: {
-    1: 0.10, // 10% nível 1
-    2: 0.07, // 7% nível 2
-    3: 0.05, // 5% nível 3
-    4: 0.03, // 3% nível 4
-    5: 0.02  // 2% nível 5
-  },
-  diamond: {
-    1: 0.15, // 15% nível 1
-    2: 0.10, // 10% nível 2
-    3: 0.07, // 7% nível 3
-    4: 0.05, // 5% nível 4
-    5: 0.03  // 3% nível 5
-  }
-};
+interface UpdateCpaModelRequest extends FastifyRequest {
+  Body: { model: CpaValidationModel };
+}
 
 export class CommissionsController {
   /**
@@ -119,6 +94,7 @@ export class CommissionsController {
 
       const { 
         status, 
+        type,
         level, 
         dateFrom, 
         dateTo, 
@@ -134,6 +110,10 @@ export class CommissionsController {
 
       if (status) {
         where.status = status;
+      }
+
+      if (type) {
+        where.type = type;
       }
 
       if (level) {
@@ -173,7 +153,7 @@ export class CommissionsController {
               select: {
                 id: true,
                 referralCode: true,
-                category: true,
+                validatedReferrals: true,
                 user: {
                   select: {
                     name: true,
@@ -201,25 +181,33 @@ export class CommissionsController {
         }
       });
 
+      // Calcular categoria e level atual do afiliado
+      const categoryInfo = CommissionService.calculateCategoryAndLevel(affiliate.validatedReferrals);
+
       return reply.send({
         success: true,
         data: {
           commissions: commissions.map(commission => ({
             id: commission.id,
             transactionId: commission.transactionId,
+            type: commission.type,
             level: commission.level,
-            percentage: Number(commission.percentage),
+            percentage: commission.percentage ? Number(commission.percentage) : null,
             amount: Number(commission.amount),
             status: commission.status,
             calculatedAt: commission.calculatedAt,
             approvedAt: commission.approvedAt,
             paidAt: commission.paidAt,
             metadata: commission.metadata,
-            transaction: {
+            transaction: commission.transaction ? {
               ...commission.transaction,
               amount: Number(commission.transaction.amount)
-            },
-            affiliate: commission.affiliate
+            } : null,
+            affiliate: {
+              ...commission.affiliate,
+              category: CommissionService.calculateCategoryAndLevel(commission.affiliate.validatedReferrals).category,
+              level: CommissionService.calculateCategoryAndLevel(commission.affiliate.validatedReferrals).level
+            }
           })),
           pagination: {
             page: parseInt(page),
@@ -230,6 +218,15 @@ export class CommissionsController {
           stats: {
             totalAmount: Number(stats._sum.amount || 0),
             totalCommissions: stats._count._all
+          },
+          affiliateInfo: {
+            id: affiliate.id,
+            validatedReferrals: affiliate.validatedReferrals,
+            category: categoryInfo.category,
+            level: categoryInfo.level,
+            revLevel1: categoryInfo.revLevel1,
+            revLevels2to5: categoryInfo.revLevels2to5,
+            negativeCarryover: Number(affiliate.negativeCarryover)
           }
         }
       });
@@ -283,7 +280,7 @@ export class CommissionsController {
             select: {
               id: true,
               referralCode: true,
-              category: true,
+              validatedReferrals: true,
               user: {
                 select: {
                   name: true,
@@ -320,24 +317,31 @@ export class CommissionsController {
         });
       }
 
+      const categoryInfo = CommissionService.calculateCategoryAndLevel(commission.affiliate.validatedReferrals);
+
       return reply.send({
         success: true,
         data: {
           id: commission.id,
           transactionId: commission.transactionId,
+          type: commission.type,
           level: commission.level,
-          percentage: Number(commission.percentage),
+          percentage: commission.percentage ? Number(commission.percentage) : null,
           amount: Number(commission.amount),
           status: commission.status,
           calculatedAt: commission.calculatedAt,
           approvedAt: commission.approvedAt,
           paidAt: commission.paidAt,
           metadata: commission.metadata,
-          transaction: {
+          transaction: commission.transaction ? {
             ...commission.transaction,
             amount: Number(commission.transaction.amount)
-          },
-          affiliate: commission.affiliate
+          } : null,
+          affiliate: {
+            ...commission.affiliate,
+            category: categoryInfo.category,
+            level: categoryInfo.level
+          }
         }
       });
 
@@ -354,9 +358,9 @@ export class CommissionsController {
   }
 
   /**
-   * Calcula comissões MLM para uma transação
+   * Calcula comissões RevShare para uma transação
    */
-  static async calculateCommissions(request: any, reply: FastifyReply) {
+  static async calculateRevShare(request: any, reply: FastifyReply) {
     try {
       const userId = request.currentUser?.id;
       const { transactionId } = request.body;
@@ -381,31 +385,12 @@ export class CommissionsController {
         });
       }
 
-      // Buscar transação
-      const transaction = await prisma.transaction.findUnique({
-        where: { id: transactionId },
-        include: {
-          affiliate: {
-            include: {
-              user: true
-            }
-          }
-        }
-      });
-
-      if (!transaction) {
-        return reply.status(404).send({
-          success: false,
-          error: {
-            code: 'TRANSACTION_NOT_FOUND',
-            message: 'Transação não encontrada'
-          }
-        });
-      }
-
-      // Verificar se já existem comissões para esta transação
+      // Verificar se já existem comissões RevShare para esta transação
       const existingCommissions = await prisma.commission.findMany({
-        where: { transactionId }
+        where: { 
+          transactionId,
+          type: 'revshare'
+        }
       });
 
       if (existingCommissions.length > 0) {
@@ -413,92 +398,228 @@ export class CommissionsController {
           success: false,
           error: {
             code: 'COMMISSIONS_ALREADY_CALCULATED',
-            message: 'Comissões já foram calculadas para esta transação'
+            message: 'Comissões RevShare já foram calculadas para esta transação'
           }
         });
       }
 
-      // Buscar hierarquia de afiliados (até 5 níveis)
-      const commissions = [];
-      let currentAffiliate = transaction.affiliate;
-      let level = 1;
-
-      while (currentAffiliate && level <= 5) {
-        // Obter percentual baseado na categoria do afiliado
-        const percentage = COMMISSION_CONFIG[currentAffiliate.category]?.[level] || 0;
-        
-        if (percentage > 0) {
-          const commissionAmount = Number(transaction.amount) * percentage;
-
-          // Criar comissão
-          const commission = await prisma.commission.create({
-            data: {
-              transactionId,
-              affiliateId: currentAffiliate.id,
-              level,
-              percentage: percentage * 100, // Converter para percentual
-              amount: commissionAmount,
-              status: 'calculated',
-              metadata: {
-                transactionType: transaction.type,
-                affiliateCategory: currentAffiliate.category,
-                calculationDate: new Date().toISOString()
-              }
-            },
-            include: {
-              affiliate: {
-                select: {
-                  id: true,
-                  referralCode: true,
-                  category: true,
-                  user: {
-                    select: {
-                      name: true,
-                      email: true
-                    }
-                  }
-                }
-              }
-            }
-          });
-
-          commissions.push({
-            id: commission.id,
-            level: commission.level,
-            percentage: Number(commission.percentage),
-            amount: Number(commission.amount),
-            affiliate: commission.affiliate
-          });
-        }
-
-        // Buscar próximo nível (afiliado pai)
-        if (currentAffiliate.parentId) {
-          currentAffiliate = await prisma.affiliate.findUnique({
-            where: { id: currentAffiliate.parentId },
-            include: {
-              user: true
-            }
-          });
-        } else {
-          currentAffiliate = null;
-        }
-
-        level++;
-      }
+      const commissions = await CommissionService.calculateRevShare(transactionId);
 
       return reply.status(201).send({
         success: true,
         data: {
           transactionId,
-          transactionAmount: Number(transaction.amount),
           commissionsCalculated: commissions.length,
-          totalCommissionAmount: commissions.reduce((sum, c) => sum + c.amount, 0),
-          commissions
+          totalCommissionAmount: commissions.reduce((sum, c) => sum + Number(c.amount), 0),
+          commissions: commissions.map(c => ({
+            id: c.id,
+            affiliateId: c.affiliateId,
+            type: c.type,
+            level: c.level,
+            percentage: c.percentage ? Number(c.percentage) : null,
+            amount: Number(c.amount),
+            status: c.status
+          }))
         }
       });
 
     } catch (error) {
-      console.error('Erro ao calcular comissões:', error);
+      console.error('Erro ao calcular comissões RevShare:', error);
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: error.message || 'Erro interno do servidor'
+        }
+      });
+    }
+  }
+
+  /**
+   * Processa CPA para uma indicação validada
+   */
+  static async processCpa(request: any, reply: FastifyReply) {
+    try {
+      const userId = request.currentUser?.id;
+      const { referralId } = request.body;
+      
+      if (!userId) {
+        return reply.status(401).send({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Token de acesso inválido'
+          }
+        });
+      }
+
+      if (!referralId) {
+        return reply.status(400).send({
+          success: false,
+          error: {
+            code: 'INVALID_DATA',
+            message: 'ID da indicação é obrigatório'
+          }
+        });
+      }
+
+      // Validar indicação para CPA
+      const isValid = await CommissionService.validateReferralForCpa(referralId);
+      
+      if (!isValid) {
+        return reply.status(400).send({
+          success: false,
+          error: {
+            code: 'REFERRAL_NOT_VALID',
+            message: 'Indicação não atende aos critérios de validação CPA'
+          }
+        });
+      }
+
+      const commissions = await CommissionService.processCpa(referralId);
+
+      return reply.status(201).send({
+        success: true,
+        data: {
+          referralId,
+          commissionsCalculated: commissions.length,
+          totalCpaAmount: commissions.reduce((sum, c) => sum + Number(c.amount), 0),
+          commissions: commissions.map(c => ({
+            id: c.id,
+            affiliateId: c.affiliateId,
+            type: c.type,
+            level: c.level,
+            amount: Number(c.amount),
+            status: c.status
+          }))
+        }
+      });
+
+    } catch (error) {
+      console.error('Erro ao processar CPA:', error);
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: error.message || 'Erro interno do servidor'
+        }
+      });
+    }
+  }
+
+  /**
+   * Obtém configuração CPA ativa
+   */
+  static async getCpaConfiguration(request: any, reply: FastifyReply) {
+    try {
+      const userId = request.currentUser?.id;
+      
+      if (!userId) {
+        return reply.status(401).send({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Token de acesso inválido'
+          }
+        });
+      }
+
+      const config = await CommissionService.getCpaConfiguration();
+
+      return reply.send({
+        success: true,
+        data: {
+          id: config.id,
+          activeModel: config.activeModel,
+          totalAmount: Number(config.totalAmount),
+          distribution: {
+            level1: Number(config.level1Amount),
+            level2: Number(config.level2Amount),
+            level3: Number(config.level3Amount),
+            level4: Number(config.level4Amount),
+            level5: Number(config.level5Amount)
+          },
+          validationCriteria: {
+            minDeposit: Number(config.minDeposit),
+            minBets: config.minBets,
+            minGgr: Number(config.minGgr)
+          },
+          isActive: config.isActive,
+          createdAt: config.createdAt,
+          updatedAt: config.updatedAt
+        }
+      });
+
+    } catch (error) {
+      console.error('Erro ao buscar configuração CPA:', error);
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Erro interno do servidor'
+        }
+      });
+    }
+  }
+
+  /**
+   * Atualiza modelo de validação CPA (apenas admin)
+   */
+  static async updateCpaValidationModel(request: any, reply: FastifyReply) {
+    try {
+      const userId = request.currentUser?.id;
+      const { model } = request.body;
+      
+      if (!userId) {
+        return reply.status(401).send({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Token de acesso inválido'
+          }
+        });
+      }
+
+      // TODO: Verificar se usuário é admin
+      // Por enquanto, permitir para qualquer usuário autenticado
+
+      if (!model || !['model_1_1', 'model_1_2'].includes(model)) {
+        return reply.status(400).send({
+          success: false,
+          error: {
+            code: 'INVALID_MODEL',
+            message: 'Modelo de validação inválido. Use model_1_1 ou model_1_2'
+          }
+        });
+      }
+
+      const config = await CommissionService.updateCpaValidationModel(model);
+
+      return reply.send({
+        success: true,
+        data: {
+          id: config.id,
+          activeModel: config.activeModel,
+          totalAmount: Number(config.totalAmount),
+          distribution: {
+            level1: Number(config.level1Amount),
+            level2: Number(config.level2Amount),
+            level3: Number(config.level3Amount),
+            level4: Number(config.level4Amount),
+            level5: Number(config.level5Amount)
+          },
+          validationCriteria: {
+            minDeposit: Number(config.minDeposit),
+            minBets: config.minBets,
+            minGgr: Number(config.minGgr)
+          },
+          isActive: config.isActive,
+          createdAt: config.createdAt
+        }
+      });
+
+    } catch (error) {
+      console.error('Erro ao atualizar modelo CPA:', error);
       return reply.status(500).send({
         success: false,
         error: {
@@ -564,6 +685,7 @@ export class CommissionsController {
             select: {
               id: true,
               referralCode: true,
+              validatedReferrals: true,
               user: {
                 select: {
                   name: true,
@@ -575,14 +697,21 @@ export class CommissionsController {
         }
       });
 
+      const categoryInfo = CommissionService.calculateCategoryAndLevel(updatedCommission.affiliate.validatedReferrals);
+
       return reply.send({
         success: true,
         data: {
           id: updatedCommission.id,
+          type: updatedCommission.type,
           status: updatedCommission.status,
           approvedAt: updatedCommission.approvedAt,
           amount: Number(updatedCommission.amount),
-          affiliate: updatedCommission.affiliate
+          affiliate: {
+            ...updatedCommission.affiliate,
+            category: categoryInfo.category,
+            level: categoryInfo.level
+          }
         }
       });
 
@@ -653,6 +782,7 @@ export class CommissionsController {
             select: {
               id: true,
               referralCode: true,
+              validatedReferrals: true,
               user: {
                 select: {
                   name: true,
@@ -664,166 +794,26 @@ export class CommissionsController {
         }
       });
 
+      const categoryInfo = CommissionService.calculateCategoryAndLevel(updatedCommission.affiliate.validatedReferrals);
+
       return reply.send({
         success: true,
         data: {
           id: updatedCommission.id,
+          type: updatedCommission.type,
           status: updatedCommission.status,
           paidAt: updatedCommission.paidAt,
           amount: Number(updatedCommission.amount),
-          affiliate: updatedCommission.affiliate
+          affiliate: {
+            ...updatedCommission.affiliate,
+            category: categoryInfo.category,
+            level: categoryInfo.level
+          }
         }
       });
 
     } catch (error) {
       console.error('Erro ao marcar comissão como paga:', error);
-      return reply.status(500).send({
-        success: false,
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'Erro interno do servidor'
-        }
-      });
-    }
-  }
-
-  /**
-   * Gera relatórios de comissões
-   */
-  static async getReports(request: any, reply: FastifyReply) {
-    try {
-      const userId = request.currentUser?.id;
-      
-      if (!userId) {
-        return reply.status(401).send({
-          success: false,
-          error: {
-            code: 'UNAUTHORIZED',
-            message: 'Token de acesso inválido'
-          }
-        });
-      }
-
-      // Buscar afiliado do usuário
-      const affiliate = await prisma.affiliate.findFirst({
-        where: { userId }
-      });
-
-      if (!affiliate) {
-        return reply.status(404).send({
-          success: false,
-          error: {
-            code: 'AFFILIATE_NOT_FOUND',
-            message: 'Afiliado não encontrado'
-          }
-        });
-      }
-
-      const { period = 'month' } = request.query;
-
-      // Calcular período
-      const now = new Date();
-      let startDate: Date;
-
-      switch (period) {
-        case 'week':
-          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          break;
-        case 'month':
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-          break;
-        case 'quarter':
-          const quarter = Math.floor(now.getMonth() / 3);
-          startDate = new Date(now.getFullYear(), quarter * 3, 1);
-          break;
-        case 'year':
-          startDate = new Date(now.getFullYear(), 0, 1);
-          break;
-        default:
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-      }
-
-      // Relatório por status
-      const statusReport = await prisma.commission.groupBy({
-        by: ['status'],
-        where: {
-          affiliateId: affiliate.id,
-          calculatedAt: {
-            gte: startDate
-          }
-        },
-        _sum: {
-          amount: true
-        },
-        _count: {
-          _all: true
-        }
-      });
-
-      // Relatório por nível
-      const levelReport = await prisma.commission.groupBy({
-        by: ['level'],
-        where: {
-          affiliateId: affiliate.id,
-          calculatedAt: {
-            gte: startDate
-          }
-        },
-        _sum: {
-          amount: true
-        },
-        _count: {
-          _all: true
-        },
-        orderBy: {
-          level: 'asc'
-        }
-      });
-
-      // Tendência diária (últimos 30 dias)
-      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      const dailyTrend = await prisma.$queryRaw`
-        SELECT 
-          DATE(calculated_at) as date,
-          COUNT(*)::int as count,
-          SUM(amount)::float as total_amount
-        FROM commissions 
-        WHERE affiliate_id = ${affiliate.id}::uuid
-          AND calculated_at >= ${thirtyDaysAgo}
-        GROUP BY DATE(calculated_at)
-        ORDER BY date ASC
-      `;
-
-      return reply.send({
-        success: true,
-        data: {
-          period,
-          startDate,
-          endDate: now,
-          summary: {
-            totalCommissions: statusReport.reduce((sum, item) => sum + item._count._all, 0),
-            totalAmount: statusReport.reduce((sum, item) => sum + Number(item._sum.amount || 0), 0)
-          },
-          byStatus: statusReport.map(item => ({
-            status: item.status,
-            count: item._count._all,
-            amount: Number(item._sum.amount || 0)
-          })),
-          byLevel: levelReport.map(item => ({
-            level: item.level,
-            count: item._count._all,
-            amount: Number(item._sum.amount || 0)
-          })),
-          dailyTrend: dailyTrend.map((item: any) => ({
-            date: item.date,
-            count: item.count,
-            amount: item.total_amount
-          }))
-        }
-      });
-
-    } catch (error) {
-      console.error('Erro ao gerar relatórios de comissões:', error);
       return reply.status(500).send({
         success: false,
         error: {

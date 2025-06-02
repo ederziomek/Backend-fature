@@ -20,10 +20,12 @@ enum UserStatus {
 }
 
 enum AffiliateCategory {
-  standard
-  premium
-  vip
-  diamond
+  jogador
+  iniciante
+  afiliado
+  profissional
+  expert
+  mestre
 }
 
 enum AffiliateStatus {
@@ -54,6 +56,16 @@ enum CommissionStatus {
   paid
   cancelled
   disputed
+}
+
+enum CommissionType {
+  cpa
+  revshare
+}
+
+enum CpaValidationModel {
+  model_1_1
+  model_1_2
 }
 
 enum ChestRarity {
@@ -153,7 +165,6 @@ model Affiliate {
   userId                  String            @unique @map("user_id") @db.Uuid
   parentId                String?           @map("parent_id") @db.Uuid
   referralCode            String            @unique @map("referral_code") @db.VarChar(20)
-  category                AffiliateCategory @default(standard)
   level                   Int               @default(0)
   status                  AffiliateStatus   @default(active)
   joinedAt                DateTime          @default(now()) @map("joined_at")
@@ -161,11 +172,13 @@ model Affiliate {
   inactivityAppliedAt     DateTime?         @map("inactivity_applied_at")
   reactivationCount       Int               @default(0) @map("reactivation_count")
   totalReferrals          Int               @default(0) @map("total_referrals")
+  validatedReferrals      Int               @default(0) @map("validated_referrals")
   activeReferrals         Int               @default(0) @map("active_referrals")
   lifetimeVolume          Decimal           @default(0) @map("lifetime_volume") @db.Decimal(15, 2)
   lifetimeCommissions     Decimal           @default(0) @map("lifetime_commissions") @db.Decimal(15, 2)
   currentMonthVolume      Decimal           @default(0) @map("current_month_volume") @db.Decimal(15, 2)
   currentMonthCommissions Decimal           @default(0) @map("current_month_commissions") @db.Decimal(15, 2)
+  negativeCarryover       Decimal           @default(0) @map("negative_carryover") @db.Decimal(15, 2)
   metadata                Json?
   createdAt               DateTime          @default(now()) @map("created_at")
   updatedAt               DateTime          @updatedAt @map("updated_at")
@@ -182,6 +195,7 @@ model Affiliate {
   // Transações e comissões
   transactions            Transaction[]
   commissions             Commission[]
+  referrals               Referral[]
   
   // Gamificação
   sequences               AffiliateSequence[]
@@ -233,10 +247,11 @@ model Transaction {
 
 model Commission {
   id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  transactionId String           @map("transaction_id") @db.Uuid
+  transactionId String?          @map("transaction_id") @db.Uuid
   affiliateId   String           @map("affiliate_id") @db.Uuid
+  type          CommissionType   @default(revshare)
   level         Int
-  percentage    Decimal          @db.Decimal(5, 2)
+  percentage    Decimal?         @db.Decimal(5, 2)
   amount        Decimal          @db.Decimal(15, 2)
   status        CommissionStatus @default(calculated)
   calculatedAt  DateTime         @default(now()) @map("calculated_at")
@@ -247,7 +262,7 @@ model Commission {
   updatedAt     DateTime         @updatedAt @map("updated_at")
 
   // Relacionamentos
-  transaction   Transaction      @relation(fields: [transactionId], references: [id])
+  transaction   Transaction?     @relation(fields: [transactionId], references: [id])
   affiliate     Affiliate        @relation(fields: [affiliateId], references: [id])
 
   @@map("commissions")
@@ -404,6 +419,52 @@ model AuditLog {
   user       User?       @relation(fields: [userId], references: [id])
 
   @@map("audit_logs")
+}
+
+// Sistema de configuração CPA
+
+model CpaConfiguration {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  activeModel       CpaValidationModel @default(model_1_1) @map("active_model")
+  totalAmount       Decimal           @default(60.00) @map("total_amount") @db.Decimal(10, 2)
+  level1Amount      Decimal           @default(35.00) @map("level1_amount") @db.Decimal(10, 2)
+  level2Amount      Decimal           @default(10.00) @map("level2_amount") @db.Decimal(10, 2)
+  level3Amount      Decimal           @default(5.00) @map("level3_amount") @db.Decimal(10, 2)
+  level4Amount      Decimal           @default(5.00) @map("level4_amount") @db.Decimal(10, 2)
+  level5Amount      Decimal           @default(5.00) @map("level5_amount") @db.Decimal(10, 2)
+  minDeposit        Decimal           @default(30.00) @map("min_deposit") @db.Decimal(10, 2)
+  minBets           Int               @default(10) @map("min_bets")
+  minGgr            Decimal           @default(20.00) @map("min_ggr") @db.Decimal(10, 2)
+  isActive          Boolean           @default(true) @map("is_active")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  @@map("cpa_configurations")
+}
+
+// Sistema de indicações e validações
+
+model Referral {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  affiliateId       String    @map("affiliate_id") @db.Uuid
+  customerId        String    @map("customer_id") @db.Uuid
+  isValidated       Boolean   @default(false) @map("is_validated")
+  validatedAt       DateTime? @map("validated_at")
+  firstDeposit      Decimal?  @map("first_deposit") @db.Decimal(15, 2)
+  firstDepositAt    DateTime? @map("first_deposit_at")
+  totalBets         Int       @default(0) @map("total_bets")
+  totalGgr          Decimal   @default(0) @map("total_ggr") @db.Decimal(15, 2)
+  cpaProcessed      Boolean   @default(false) @map("cpa_processed")
+  cpaProcessedAt    DateTime? @map("cpa_processed_at")
+  metadata          Json?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  // Relacionamentos
+  affiliate         Affiliate @relation(fields: [affiliateId], references: [id])
+
+  @@unique([affiliateId, customerId])
+  @@map("referrals")
 }
 
 // Índices adicionais

@@ -21,6 +21,11 @@ export async function commissionsRoutes(fastify: FastifyInstance) {
             enum: ['calculated', 'approved', 'paid', 'cancelled', 'disputed'],
             description: 'Filtrar por status da comissão'
           },
+          type: {
+            type: 'string',
+            enum: ['cpa', 'revshare'],
+            description: 'Filtrar por tipo de comissão'
+          },
           level: {
             type: 'integer',
             minimum: 1,
@@ -56,80 +61,6 @@ export async function commissionsRoutes(fastify: FastifyInstance) {
             description: 'Itens por página'
           }
         }
-      },
-      response: {
-        200: {
-          type: 'object',
-          properties: {
-            success: { type: 'boolean' },
-            data: {
-              type: 'object',
-              properties: {
-                commissions: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      id: { type: 'string', format: 'uuid' },
-                      transactionId: { type: 'string', format: 'uuid' },
-                      level: { type: 'integer' },
-                      percentage: { type: 'number' },
-                      amount: { type: 'number' },
-                      status: { type: 'string' },
-                      calculatedAt: { type: 'string', format: 'date-time' },
-                      approvedAt: { type: 'string', format: 'date-time', nullable: true },
-                      paidAt: { type: 'string', format: 'date-time', nullable: true },
-                      metadata: { type: 'object', nullable: true },
-                      transaction: {
-                        type: 'object',
-                        properties: {
-                          id: { type: 'string', format: 'uuid' },
-                          externalId: { type: 'string', nullable: true },
-                          type: { type: 'string' },
-                          amount: { type: 'number' },
-                          currency: { type: 'string' },
-                          description: { type: 'string', nullable: true },
-                          createdAt: { type: 'string', format: 'date-time' }
-                        }
-                      },
-                      affiliate: {
-                        type: 'object',
-                        properties: {
-                          id: { type: 'string', format: 'uuid' },
-                          referralCode: { type: 'string' },
-                          category: { type: 'string' },
-                          user: {
-                            type: 'object',
-                            properties: {
-                              name: { type: 'string' },
-                              email: { type: 'string' }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                },
-                pagination: {
-                  type: 'object',
-                  properties: {
-                    page: { type: 'integer' },
-                    limit: { type: 'integer' },
-                    total: { type: 'integer' },
-                    pages: { type: 'integer' }
-                  }
-                },
-                stats: {
-                  type: 'object',
-                  properties: {
-                    totalAmount: { type: 'number' },
-                    totalCommissions: { type: 'integer' }
-                  }
-                }
-              }
-            }
-          }
-        }
       }
     }
   }, CommissionsController.list);
@@ -150,77 +81,14 @@ export async function commissionsRoutes(fastify: FastifyInstance) {
             description: 'ID da comissão'
           }
         }
-      },
-      response: {
-        200: {
-          type: 'object',
-          properties: {
-            success: { type: 'boolean' },
-            data: {
-              type: 'object',
-              properties: {
-                id: { type: 'string', format: 'uuid' },
-                transactionId: { type: 'string', format: 'uuid' },
-                level: { type: 'integer' },
-                percentage: { type: 'number' },
-                amount: { type: 'number' },
-                status: { type: 'string' },
-                calculatedAt: { type: 'string', format: 'date-time' },
-                approvedAt: { type: 'string', format: 'date-time', nullable: true },
-                paidAt: { type: 'string', format: 'date-time', nullable: true },
-                metadata: { type: 'object', nullable: true },
-                transaction: {
-                  type: 'object',
-                  properties: {
-                    id: { type: 'string', format: 'uuid' },
-                    externalId: { type: 'string', nullable: true },
-                    type: { type: 'string' },
-                    amount: { type: 'number' },
-                    currency: { type: 'string' },
-                    description: { type: 'string', nullable: true },
-                    createdAt: { type: 'string', format: 'date-time' }
-                  }
-                },
-                affiliate: {
-                  type: 'object',
-                  properties: {
-                    id: { type: 'string', format: 'uuid' },
-                    referralCode: { type: 'string' },
-                    category: { type: 'string' },
-                    user: {
-                      type: 'object',
-                      properties: {
-                        name: { type: 'string' },
-                        email: { type: 'string' }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        404: {
-          type: 'object',
-          properties: {
-            success: { type: 'boolean' },
-            error: {
-              type: 'object',
-              properties: {
-                code: { type: 'string' },
-                message: { type: 'string' }
-              }
-            }
-          }
-        }
       }
     }
   }, CommissionsController.getById);
 
-  // Calcular comissões para uma transação
-  fastify.post('/calculate', {
+  // Calcular comissões RevShare para uma transação
+  fastify.post('/calculate-revshare', {
     schema: {
-      description: 'Calcula comissões MLM para uma transação específica',
+      description: 'Calcula comissões RevShare para uma transação específica',
       tags: ['Comissões'],
       security: [{ bearerAuth: [] }],
       body: {
@@ -230,69 +98,61 @@ export async function commissionsRoutes(fastify: FastifyInstance) {
           transactionId: {
             type: 'string',
             format: 'uuid',
-            description: 'ID da transação para calcular comissões'
-          }
-        }
-      },
-      response: {
-        201: {
-          type: 'object',
-          properties: {
-            success: { type: 'boolean' },
-            data: {
-              type: 'object',
-              properties: {
-                transactionId: { type: 'string', format: 'uuid' },
-                transactionAmount: { type: 'number' },
-                commissionsCalculated: { type: 'integer' },
-                totalCommissionAmount: { type: 'number' },
-                commissions: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      id: { type: 'string', format: 'uuid' },
-                      level: { type: 'integer' },
-                      percentage: { type: 'number' },
-                      amount: { type: 'number' },
-                      affiliate: {
-                        type: 'object',
-                        properties: {
-                          id: { type: 'string', format: 'uuid' },
-                          referralCode: { type: 'string' },
-                          category: { type: 'string' },
-                          user: {
-                            type: 'object',
-                            properties: {
-                              name: { type: 'string' },
-                              email: { type: 'string' }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        409: {
-          type: 'object',
-          properties: {
-            success: { type: 'boolean' },
-            error: {
-              type: 'object',
-              properties: {
-                code: { type: 'string' },
-                message: { type: 'string' }
-              }
-            }
+            description: 'ID da transação para calcular comissões RevShare'
           }
         }
       }
     }
-  }, CommissionsController.calculateCommissions);
+  }, CommissionsController.calculateRevShare);
+
+  // Processar CPA para uma indicação
+  fastify.post('/process-cpa', {
+    schema: {
+      description: 'Processa CPA para uma indicação validada',
+      tags: ['Comissões'],
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['referralId'],
+        properties: {
+          referralId: {
+            type: 'string',
+            format: 'uuid',
+            description: 'ID da indicação para processar CPA'
+          }
+        }
+      }
+    }
+  }, CommissionsController.processCpa);
+
+  // Obter configuração CPA
+  fastify.get('/cpa/configuration', {
+    schema: {
+      description: 'Obtém a configuração CPA ativa',
+      tags: ['Comissões'],
+      security: [{ bearerAuth: [] }]
+    }
+  }, CommissionsController.getCpaConfiguration);
+
+  // Atualizar modelo de validação CPA (apenas admin)
+  fastify.put('/cpa/validation-model', {
+    schema: {
+      description: 'Atualiza o modelo de validação CPA ativo (apenas admin)',
+      tags: ['Comissões'],
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['model'],
+        properties: {
+          model: {
+            type: 'string',
+            enum: ['model_1_1', 'model_1_2'],
+            description: 'Modelo de validação CPA'
+          }
+        }
+      }
+    }
+  }, CommissionsController.updateCpaValidationModel);
 
   // Aprovar comissão
   fastify.put('/:id/approve', {
@@ -308,37 +168,6 @@ export async function commissionsRoutes(fastify: FastifyInstance) {
             type: 'string',
             format: 'uuid',
             description: 'ID da comissão'
-          }
-        }
-      },
-      response: {
-        200: {
-          type: 'object',
-          properties: {
-            success: { type: 'boolean' },
-            data: {
-              type: 'object',
-              properties: {
-                id: { type: 'string', format: 'uuid' },
-                status: { type: 'string' },
-                approvedAt: { type: 'string', format: 'date-time' },
-                amount: { type: 'number' },
-                affiliate: {
-                  type: 'object',
-                  properties: {
-                    id: { type: 'string', format: 'uuid' },
-                    referralCode: { type: 'string' },
-                    user: {
-                      type: 'object',
-                      properties: {
-                        name: { type: 'string' },
-                        email: { type: 'string' }
-                      }
-                    }
-                  }
-                }
-              }
-            }
           }
         }
       }
@@ -361,115 +190,8 @@ export async function commissionsRoutes(fastify: FastifyInstance) {
             description: 'ID da comissão'
           }
         }
-      },
-      response: {
-        200: {
-          type: 'object',
-          properties: {
-            success: { type: 'boolean' },
-            data: {
-              type: 'object',
-              properties: {
-                id: { type: 'string', format: 'uuid' },
-                status: { type: 'string' },
-                paidAt: { type: 'string', format: 'date-time' },
-                amount: { type: 'number' },
-                affiliate: {
-                  type: 'object',
-                  properties: {
-                    id: { type: 'string', format: 'uuid' },
-                    referralCode: { type: 'string' },
-                    user: {
-                      type: 'object',
-                      properties: {
-                        name: { type: 'string' },
-                        email: { type: 'string' }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
       }
     }
   }, CommissionsController.pay);
-
-  // Relatórios de comissões
-  fastify.get('/reports', {
-    schema: {
-      description: 'Gera relatórios de comissões com estatísticas e tendências',
-      tags: ['Comissões'],
-      security: [{ bearerAuth: [] }],
-      querystring: {
-        type: 'object',
-        properties: {
-          period: {
-            type: 'string',
-            enum: ['week', 'month', 'quarter', 'year'],
-            default: 'month',
-            description: 'Período do relatório'
-          }
-        }
-      },
-      response: {
-        200: {
-          type: 'object',
-          properties: {
-            success: { type: 'boolean' },
-            data: {
-              type: 'object',
-              properties: {
-                period: { type: 'string' },
-                startDate: { type: 'string', format: 'date-time' },
-                endDate: { type: 'string', format: 'date-time' },
-                summary: {
-                  type: 'object',
-                  properties: {
-                    totalCommissions: { type: 'integer' },
-                    totalAmount: { type: 'number' }
-                  }
-                },
-                byStatus: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      status: { type: 'string' },
-                      count: { type: 'integer' },
-                      amount: { type: 'number' }
-                    }
-                  }
-                },
-                byLevel: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      level: { type: 'integer' },
-                      count: { type: 'integer' },
-                      amount: { type: 'number' }
-                    }
-                  }
-                },
-                dailyTrend: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      date: { type: 'string', format: 'date' },
-                      count: { type: 'integer' },
-                      amount: { type: 'number' }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }, CommissionsController.getReports);
 }
 
