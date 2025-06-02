@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { AuthController } from '@/controllers/auth';
+import { authMiddleware } from '@/middleware/auth';
 
 // Schemas de resposta para documentação
 const authResponseSchema = {
@@ -174,6 +175,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
         401: errorResponseSchema,
       },
     },
+    preHandler: authMiddleware
   }, AuthController.me);
 
   // POST /auth/verify-email

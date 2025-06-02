@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { AffiliatesController } from '@/controllers/affiliates';
 import { authMiddleware } from '@/middleware/auth';
+import { debugAuthMiddleware } from '@/middleware/debug-auth';
 
 // Schemas para documentação Swagger
 const affiliateResponseSchema = {
