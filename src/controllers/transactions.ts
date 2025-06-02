@@ -253,7 +253,7 @@ export class TransactionsController {
             commissions: {
               select: {
                 id: true,
-                finalAmount: true,
+                amount: true,
                 status: true
               }
             }
@@ -296,7 +296,7 @@ export class TransactionsController {
               name: transaction.affiliate.user.name
             },
             commissionsCount: transaction.commissions.length,
-            totalCommissions: transaction.commissions.reduce((sum, c) => sum + Number(c.finalAmount), 0),
+            totalCommissions: transaction.commissions.reduce((sum, c) => sum + Number(c.amount), 0),
             createdAt: transaction.createdAt,
             updatedAt: transaction.updatedAt
           })),
@@ -429,7 +429,7 @@ export class TransactionsController {
           commissions: transaction.commissions.map(commission => ({
             id: commission.id,
             level: commission.level,
-            amount: Number(commission.finalAmount),
+            amount: Number(commission.amount),
             status: commission.status,
             affiliate: {
               id: commission.affiliate.id,
