@@ -33,8 +33,13 @@ const REVSHARE_STRUCTURE = [
   { category: "expert", level: 1, minReferrals: 1001, maxReferrals: 1100, revTotal: 44.00, revLevel1: 24.00, revLevels2to5: 5.00 },
   { category: "expert", level: 90, minReferrals: 9901, maxReferrals: 10000, revTotal: 50.00, revLevel1: 30.00, revLevels2to5: 5.00 },
   
-  // MESTRE (100+ levels) - Alguns exemplos
+  // MESTRE (100 levels) - Alguns exemplos
   { category: "mestre", level: 1, minReferrals: 10001, maxReferrals: 11000, revTotal: 54.00, revLevel1: 30.00, revLevels2to5: 6.00 },
+  { category: "mestre", level: 90, minReferrals: 99001, maxReferrals: 100000, revTotal: 69.33, revLevel1: 41.33, revLevels2to5: 7.00 },
+  
+  // LENDA (90 levels) - Alguns exemplos
+  { category: "lenda", level: 1, minReferrals: 100001, maxReferrals: 110000, revTotal: 60.00, revLevel1: 36.00, revLevels2to5: 6.00 },
+  { category: "lenda", level: 90, minReferrals: 990001, maxReferrals: 999999999, revTotal: 70.00, revLevel1: 42.00, revLevels2to5: 7.00 },
 ];
 
 export class CommissionService {
