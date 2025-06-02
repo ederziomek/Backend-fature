@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { JwtService } from '@/utils/jwt';
-import { CacheService } from '@/config/redis';
+import { cache } from '@/config/redis';
 import { prisma } from '@/config/database';
 
 /**
@@ -24,7 +24,7 @@ export async function authMiddleware(
     }
 
     // Verificar se o token está na blacklist
-    const isBlacklisted = await CacheService.exists(`blacklist:${token}`);
+    const isBlacklisted = await cache.exists(`blacklist:${token}`);
     if (isBlacklisted) {
       return reply.status(401).send({
         code: 'TOKEN_BLACKLISTED',
@@ -224,7 +224,7 @@ export async function optionalAuthMiddleware(
     }
 
     // Verificar se o token está na blacklist
-    const isBlacklisted = await CacheService.exists(`blacklist:${token}`);
+    const isBlacklisted = await cache.exists(`blacklist:${token}`);
     if (isBlacklisted) {
       return; // Continua sem autenticação
     }

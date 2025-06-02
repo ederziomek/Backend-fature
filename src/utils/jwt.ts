@@ -11,7 +11,7 @@ export class JwtService {
       expiresIn: config.jwt.expiresIn,
       issuer: 'fature-api',
       audience: 'fature-app',
-    });
+    } as jwt.SignOptions);
   }
 
   /**
@@ -22,7 +22,7 @@ export class JwtService {
       expiresIn: config.jwt.refreshExpiresIn,
       issuer: 'fature-api',
       audience: 'fature-app',
-    });
+    } as jwt.SignOptions);
   }
 
   /**
@@ -78,7 +78,7 @@ export class JwtService {
       return null;
     }
 
-    return parts[1];
+    return parts[1] || null;
   }
 
   /**

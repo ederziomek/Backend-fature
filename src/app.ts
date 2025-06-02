@@ -1,7 +1,7 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import { config } from '@/config';
 import { connectDatabase } from '@/config/database';
-import { connectRedis } from '@/config/redis';
+import { testRedisConnection } from '@/config/redis';
 
 // Plugins do Fastify
 import cors from '@fastify/cors';
@@ -42,7 +42,7 @@ async function createApp(): Promise<FastifyInstance> {
 
   // Conectar ao banco de dados e Redis
   await connectDatabase();
-  await connectRedis();
+  await testRedisConnection();
 
   // Registrar plugins de segurança
   await app.register(helmet, {

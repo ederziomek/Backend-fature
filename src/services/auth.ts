@@ -1,5 +1,5 @@
 import { prisma } from '@/config/database';
-import { CacheService } from '@/config/redis';
+import { cache } from '@/config/redis';
 import { JwtService } from '@/utils/jwt';
 import { PasswordService, CryptoService, ValidationService } from '@/utils/security';
 import { JwtPayload } from '@/types/fastify';
@@ -103,7 +103,7 @@ export class AuthService {
     };
 
     const accessToken = JwtService.generateAccessToken(tokenPayload);
-    const refreshTokenId = CryptoService.generateSecureToken();
+    const refreshTokenId = CryptoService.generateUniqueId();
     const refreshToken = JwtService.generateRefreshToken({
       sub: user.id,
       tokenId: refreshTokenId,
@@ -111,7 +111,7 @@ export class AuthService {
 
     // Salvar refresh token no cache
     const refreshTokenTtl = data.rememberMe ? 30 * 24 * 60 * 60 : 7 * 24 * 60 * 60; // 30 dias ou 7 dias
-    await CacheService.set(`refresh_token:${refreshTokenId}`, {
+    await cache.set(`refresh_token:${refreshTokenId}`, {
       userId: user.id,
       createdAt: new Date().toISOString(),
     }, refreshTokenTtl);
@@ -163,7 +163,7 @@ export class AuthService {
       throw new Error(`Senha inválida: ${passwordValidation.errors.join(', ')}`);
     }
 
-    if (data.phone && !ValidationService.isValidBrazilianPhone(data.phone)) {
+    if (data.phone && !ValidationService.isValidPhone(data.phone)) {
       throw new Error('Telefone inválido');
     }
 
@@ -218,8 +218,8 @@ export class AuthService {
           email: data.email.toLowerCase(),
           passwordHash,
           name: ValidationService.sanitizeString(data.name),
-          phone: data.phone,
-          document: data.document,
+          phone: data.phone || null,
+          document: data.document || null,
           status: 'pending', // Requer verificação de email
         },
       });
@@ -246,7 +246,7 @@ export class AuthService {
       const affiliate = await tx.affiliate.create({
         data: {
           userId: user.id,
-          parentId: parentAffiliate?.id,
+          parentId: parentAffiliate?.id || null,
           referralCode,
           category: 'standard',
           level: parentAffiliate ? parentAffiliate.level + 1 : 0,
@@ -278,14 +278,14 @@ export class AuthService {
     };
 
     const accessToken = JwtService.generateAccessToken(tokenPayload);
-    const refreshTokenId = CryptoService.generateSecureToken();
+    const refreshTokenId = CryptoService.generateUniqueId();
     const refreshToken = JwtService.generateRefreshToken({
       sub: result.user.id,
       tokenId: refreshTokenId,
     });
 
     // Salvar refresh token no cache
-    await CacheService.set(`refresh_token:${refreshTokenId}`, {
+    await cache.set(`refresh_token:${refreshTokenId}`, {
       userId: result.user.id,
       createdAt: new Date().toISOString(),
     }, 7 * 24 * 60 * 60); // 7 dias
@@ -320,7 +320,7 @@ export class AuthService {
       const payload = JwtService.verifyRefreshToken(refreshToken);
 
       // Verificar se o refresh token existe no cache
-      const tokenData = await CacheService.get(`refresh_token:${payload.tokenId}`);
+      const tokenData = await cache.get(`refresh_token:${payload.tokenId}`);
       if (!tokenData) {
         throw new Error('Refresh token inválido ou expirado');
       }
@@ -365,7 +365,7 @@ export class AuthService {
     if (tokenExpiration) {
       const ttl = Math.floor((tokenExpiration.getTime() - Date.now()) / 1000);
       if (ttl > 0) {
-        await CacheService.set(`blacklist:${accessToken}`, true, ttl);
+        await cache.set(`blacklist:${accessToken}`, true, ttl);
       }
     }
 
@@ -373,7 +373,7 @@ export class AuthService {
     if (refreshToken) {
       try {
         const payload = JwtService.verifyRefreshToken(refreshToken);
-        await CacheService.del(`refresh_token:${payload.tokenId}`);
+        await cache.del(`refresh_token:${payload.tokenId}`);
       } catch {
         // Ignorar erro se refresh token for inválido
       }
@@ -386,7 +386,7 @@ export class AuthService {
   static async verifyMfaCode(userId: string, code: string): Promise<boolean> {
     // Por enquanto, implementação simples
     // Em produção, usar TOTP (Time-based One-Time Password)
-    const storedCode = await CacheService.get(`mfa_code:${userId}`);
+    const storedCode = await cache.get(`mfa_code:${userId}`);
     return storedCode === code;
   }
 

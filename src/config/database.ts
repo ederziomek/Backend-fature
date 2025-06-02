@@ -52,7 +52,7 @@ export async function checkDatabaseHealth(): Promise<boolean> {
 
 // Função para executar transações
 export async function executeTransaction<T>(
-  fn: (prisma: PrismaClient) => Promise<T>
+  fn: (prisma: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => Promise<T>
 ): Promise<T> {
   return await prisma.$transaction(fn);
 }
