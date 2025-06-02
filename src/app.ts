@@ -13,6 +13,7 @@ import swaggerUi from '@fastify/swagger-ui';
 
 // Rotas
 import { authRoutes } from '@/routes/auth';
+import { usersRoutes } from '@/routes/users';
 
 // Tipos
 import '@/types/fastify';
@@ -109,6 +110,7 @@ async function createApp(): Promise<FastifyInstance> {
 
   // Registrar rotas
   await app.register(authRoutes, { prefix: '/api/auth' });
+  await app.register(usersRoutes, { prefix: '/api/users' });
 
   // Health check endpoint
   app.get('/health', {
