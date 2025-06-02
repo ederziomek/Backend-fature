@@ -7,7 +7,17 @@ export class AffiliatesController {
    */
   static async getMe(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const userId = (request.user as any).sub;
+      const userId = request.currentUser?.id;
+      
+      if (!userId) {
+        return reply.status(401).send({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Token de acesso inválido'
+          }
+        });
+      }
 
       // Buscar dados do afiliado
       const affiliate = await prisma.affiliate.findFirst({
@@ -37,7 +47,7 @@ export class AffiliatesController {
       });
 
     } catch (error) {
-      request.log.error('Erro ao buscar dados do afiliado:', error);
+      console.error('Erro ao buscar dados do afiliado:', error);
       return reply.status(500).send({
         success: false,
         error: {
@@ -53,7 +63,17 @@ export class AffiliatesController {
    */
   static async getNetwork(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const userId = (request.user as any).sub;
+      const userId = request.currentUser?.id;
+      
+      if (!userId) {
+        return reply.status(401).send({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Token de acesso inválido'
+          }
+        });
+      }
 
       // Buscar afiliado atual
       const currentAffiliate = await prisma.affiliate.findFirst({
@@ -93,7 +113,7 @@ export class AffiliatesController {
       });
 
     } catch (error) {
-      request.log.error('Erro ao buscar rede de afiliados:', error);
+      console.error('Erro ao buscar rede de afiliados:', error);
       return reply.status(500).send({
         success: false,
         error: {
@@ -135,7 +155,7 @@ export class AffiliatesController {
       });
 
     } catch (error) {
-      request.log.error('Erro ao buscar comissões do afiliado:', error);
+      console.error('Erro ao buscar comissões do afiliado:', error);
       return reply.status(500).send({
         success: false,
         error: {

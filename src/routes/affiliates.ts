@@ -191,9 +191,6 @@ const errorResponseSchema = {
 };
 
 export async function affiliatesRoutes(fastify: FastifyInstance) {
-  // Aplicar middleware de autenticação em todas as rotas
-  fastify.addHook('preHandler', authMiddleware);
-
   // GET /api/affiliates/me - Dados do afiliado autenticado
   fastify.get('/me', {
     schema: {
@@ -206,7 +203,8 @@ export async function affiliatesRoutes(fastify: FastifyInstance) {
         404: errorResponseSchema,
         500: errorResponseSchema
       }
-    }
+    },
+    preHandler: authMiddleware
   }, AffiliatesController.getMe);
 
   // GET /api/affiliates/network - Rede de afiliados
@@ -252,7 +250,8 @@ export async function affiliatesRoutes(fastify: FastifyInstance) {
         404: errorResponseSchema,
         500: errorResponseSchema
       }
-    }
+    },
+    preHandler: authMiddleware
   }, AffiliatesController.getNetwork);
 
   // PUT /api/affiliates/:id - Atualizar dados do afiliado
@@ -281,7 +280,8 @@ export async function affiliatesRoutes(fastify: FastifyInstance) {
         404: errorResponseSchema,
         500: errorResponseSchema
       }
-    }
+    },
+    preHandler: authMiddleware
   }, AffiliatesController.updateAffiliate);
 
   // GET /api/affiliates/:id/commissions - Comissões do afiliado
@@ -308,7 +308,8 @@ export async function affiliatesRoutes(fastify: FastifyInstance) {
         404: errorResponseSchema,
         500: errorResponseSchema
       }
-    }
+    },
+    preHandler: authMiddleware
   }, AffiliatesController.getCommissions);
 }
 
