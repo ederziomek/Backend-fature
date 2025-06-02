@@ -16,6 +16,7 @@ import { authRoutes } from '@/routes/auth';
 import { usersRoutes } from '@/routes/users';
 import { affiliatesRoutes } from '@/routes/affiliates';
 import { testRoutes } from '@/routes/test';
+import { transactionsRoutes } from '@/routes/transactions';
 
 // Tipos
 import '@/types/fastify';
@@ -115,6 +116,7 @@ async function createApp(): Promise<FastifyInstance> {
   await app.register(usersRoutes, { prefix: '/api/users' });
   await app.register(affiliatesRoutes, { prefix: '/api/affiliates' });
   await app.register(testRoutes, { prefix: '/api/test' });
+  await app.register(transactionsRoutes, { prefix: '/api/transactions' });
 
   // Health check endpoint
   app.get('/health', {
