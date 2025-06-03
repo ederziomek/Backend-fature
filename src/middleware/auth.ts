@@ -2,6 +2,12 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { JwtService } from '@/utils/jwt';
 import { cache } from '@/config/redis';
 import { prisma } from '@/config/database';
+import { 
+  calculateAffiliateCategory, 
+  getAffiliateCategory, 
+  enrichAffiliateWithCategory,
+  AffiliateWithCategory 
+} from '@/utils/affiliate-category-utils';
 
 /**
  * Middleware de autenticação JWT
@@ -61,7 +67,7 @@ export async function authMiddleware(
           select: {
             id: true,
             referralCode: true,
-            category: true,
+            validatedReferrals: true,
             level: true,
             status: true,
           },
@@ -97,11 +103,12 @@ export async function authMiddleware(
 
     // Adicionar informações do afiliado se existir
     if (user.affiliate) {
+      const affiliateWithCategory = enrichAffiliateWithCategory(user.affiliate);
       request.affiliate = {
         id: user.affiliate.id,
         userId: user.id,
         referralCode: user.affiliate.referralCode,
-        category: user.affiliate.category,
+        category: affiliateWithCategory.category,
         level: user.affiliate.level,
         status: user.affiliate.status,
       };
@@ -250,7 +257,7 @@ export async function optionalAuthMiddleware(
           select: {
             id: true,
             referralCode: true,
-            category: true,
+            validatedReferrals: true,
             level: true,
             status: true,
           },
@@ -269,11 +276,12 @@ export async function optionalAuthMiddleware(
 
       // Adicionar informações do afiliado se existir
       if (user.affiliate) {
+        const affiliateWithCategory = enrichAffiliateWithCategory(user.affiliate);
         request.affiliate = {
           id: user.affiliate.id,
           userId: user.id,
           referralCode: user.affiliate.referralCode,
-          category: user.affiliate.category,
+          category: affiliateWithCategory.category,
           level: user.affiliate.level,
           status: user.affiliate.status,
         };

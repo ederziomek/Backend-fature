@@ -3,6 +3,12 @@ import { cache } from '@/config/redis';
 import { JwtService } from '@/utils/jwt';
 import { PasswordService, CryptoService, ValidationService } from '@/utils/security';
 import { JwtPayload } from '@/types/fastify';
+import { 
+  calculateAffiliateCategory, 
+  getAffiliateCategory, 
+  enrichAffiliateWithCategory,
+  AffiliateWithCategory 
+} from '@/utils/affiliate-category-utils';
 
 export interface LoginRequest {
   email: string;
@@ -94,7 +100,8 @@ export class AuthService {
     }
 
     // Gerar tokens
-    const permissions = AuthService.getUserPermissions(user.affiliate?.category || 'standard');
+    const category = user.affiliate ? getAffiliateCategory(user.affiliate.validatedReferrals) : 'jogador';
+    const permissions = AuthService.getUserPermissions(category);
     const tokenPayload: Omit<JwtPayload, 'iat' | 'exp'> = {
       sub: user.id,
       email: user.email,
@@ -137,10 +144,11 @@ export class AuthService {
     };
 
     if (user.affiliate) {
+      const affiliateWithCategory = enrichAffiliateWithCategory(user.affiliate);
       response.affiliate = {
         id: user.affiliate.id,
         referralCode: user.affiliate.referralCode,
-        category: user.affiliate.category,
+        category: affiliateWithCategory.category,
         level: user.affiliate.level,
         status: user.affiliate.status,
       };
@@ -248,7 +256,7 @@ export class AuthService {
           userId: user.id,
           parentId: parentAffiliate?.id || null,
           referralCode,
-          category: 'standard',
+          validatedReferrals: 0,
           level: parentAffiliate ? parentAffiliate.level + 1 : 0,
           status: 'active',
         },
@@ -303,7 +311,7 @@ export class AuthService {
       affiliate: {
         id: result.affiliate.id,
         referralCode: result.affiliate.referralCode,
-        category: result.affiliate.category,
+        category: getAffiliateCategory(result.affiliate.validatedReferrals),
         level: result.affiliate.level,
         status: result.affiliate.status,
       },
@@ -336,7 +344,8 @@ export class AuthService {
       }
 
       // Gerar novo access token
-      const permissions = AuthService.getUserPermissions(user.affiliate?.category || 'standard');
+      const category = user.affiliate ? getAffiliateCategory(user.affiliate.validatedReferrals) : 'jogador';
+      const permissions = AuthService.getUserPermissions(category);
       const tokenPayload: Omit<JwtPayload, 'iat' | 'exp'> = {
         sub: user.id,
         email: user.email,

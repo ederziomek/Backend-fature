@@ -2,6 +2,12 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '@/config/database';
 import { cache } from '@/config/redis';
+import { 
+  calculateAffiliateCategory, 
+  getAffiliateCategory, 
+  enrichAffiliateWithCategory,
+  AffiliateWithCategory 
+} from '@/utils/affiliate-category-utils';
 
 // Schemas de validação
 const getUsersQuerySchema = z.object({
@@ -79,7 +85,7 @@ export class UsersController {
               select: {
                 id: true,
                 referralCode: true,
-                category: true,
+                validatedReferrals: true,
                 level: true,
                 status: true,
               },
@@ -167,7 +173,7 @@ export class UsersController {
             select: {
               id: true,
               referralCode: true,
-              category: true,
+              validatedReferrals: true,
               level: true,
               status: true,
               parentId: true,
@@ -297,7 +303,7 @@ export class UsersController {
             select: {
               id: true,
               referralCode: true,
-              category: true,
+              validatedReferrals: true,
               level: true,
               status: true,
             },
