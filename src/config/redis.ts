@@ -5,151 +5,84 @@ const globalForRedis = globalThis as unknown as {
   redis: Redis | undefined;
 };
 
-// Mock do Redis para fallback quando conexão falha
-class RedisMock {
-  private storage = new Map<string, { value: string; expiry?: number }>();
+// Configuração otimizada para Redis externo
+const redisConfig = {
+  // Timeouts otimizados para conexão externa
+  connectTimeout: 15000,        // 15 segundos para conexão externa
+  commandTimeout: 8000,         // 8 segundos para comandos
+  
+  // Configurações de retry moderadas (não precisamos mais de fallback complexo)
+  retryDelayOnFailover: 100,
+  maxRetriesPerRequest: 3,
+  
+  // Configurações de conexão estável
+  lazyConnect: false,           // Conecta imediatamente
+  enableReadyCheck: true,       // Verifica se Redis está pronto
+  enableOfflineQueue: true,     // Mantém comandos em queue
+  
+  // Configuração de reconexão simples
+  retryConnect: (times: number) => {
+    if (times > 5) return null; // Para após 5 tentativas
+    const delay = Math.min(times * 500, 3000); // Até 3 segundos
+    console.log(`🔄 Reconectando Redis externo em ${delay}ms (tentativa ${times})`);
+    return delay;
+  },
+  
+  // Configurações de rede
+  family: 4,                    // IPv4
+  keepAlive: 30000,            // Keep-alive de 30 segundos
+  keepAliveInitialDelay: 0,
+  
+  // Configurações para estabilidade
+  enableAutoPipelining: false,  // Desabilita auto pipelining
+  maxLoadingTimeout: 10000,     // 10 segundos para loading
+};
 
-  async ping(): Promise<string> {
-    return 'PONG';
-  }
+// Criar instância Redis com configuração otimizada
+export const redis = globalForRedis.redis ?? new Redis(config.redis.url, redisConfig);
 
-  async get(key: string): Promise<string | null> {
-    const item = this.storage.get(key);
-    if (!item) return null;
-    
-    if (item.expiry && Date.now() > item.expiry) {
-      this.storage.delete(key);
-      return null;
-    }
-    
-    return item.value;
-  }
+// Event listeners para monitoramento
+redis.on('connect', () => {
+  console.log('✅ Redis externo conectado com sucesso');
+});
 
-  async set(key: string, value: string): Promise<string> {
-    this.storage.set(key, { value });
-    return 'OK';
-  }
+redis.on('ready', () => {
+  console.log('✅ Redis externo pronto para uso');
+});
 
-  async setex(key: string, seconds: number, value: string): Promise<string> {
-    const expiry = Date.now() + (seconds * 1000);
-    this.storage.set(key, { value, expiry });
-    return 'OK';
-  }
+redis.on('error', (err: Error) => {
+  console.error('❌ Erro Redis externo:', err.message);
+});
 
-  async del(key: string): Promise<number> {
-    const existed = this.storage.has(key);
-    this.storage.delete(key);
-    return existed ? 1 : 0;
-  }
+redis.on('close', () => {
+  console.log('⚠️ Conexão Redis externo fechada');
+});
 
-  async exists(key: string): Promise<number> {
-    const item = this.storage.get(key);
-    if (!item) return 0;
-    
-    if (item.expiry && Date.now() > item.expiry) {
-      this.storage.delete(key);
-      return 0;
-    }
-    
-    return 1;
-  }
+redis.on('reconnecting', (ms: number) => {
+  console.log(`🔄 Reconectando Redis externo em ${ms}ms`);
+});
 
-  async disconnect(): Promise<void> {
-    this.storage.clear();
-  }
-
-  on(): void {}
-  off(): void {}
-}
-
-// Função para criar conexão Redis com fallback
-async function createRedisConnection(): Promise<Redis | RedisMock> {
-  try {
-    console.log('🔍 Tentando conectar ao Redis...');
-    
-    const redisConfig = {
-      connectTimeout: 10000,        // 10 segundos
-      commandTimeout: 5000,         // 5 segundos
-      retryDelayOnFailover: 100,
-      maxRetriesPerRequest: 2,      // Reduz tentativas para falhar mais rápido
-      lazyConnect: true,            // Conecta sob demanda
-      enableReadyCheck: false,
-      enableOfflineQueue: false,    // Não mantém queue offline
-      family: 4,
-      keepAlive: 30000,
-      
-      // Retry mais agressivo para falhar rápido
-      retryConnect: (times: number) => {
-        if (times > 3) return null; // Para após 3 tentativas
-        return Math.min(times * 100, 1000);
-      },
-    };
-
-    const redis = new Redis(config.redis.url, redisConfig);
-    
-    // Testa conexão com timeout
-    await Promise.race([
-      redis.ping(),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Connection timeout')), 5000)
-      )
-    ]);
-    
-    console.log('✅ Redis conectado com sucesso');
-    
-    // Event listeners apenas para logs
-    redis.on('error', (err: Error) => {
-      if (err.message.includes('ENOTFOUND')) {
-        console.warn('⚠️ Problema de DNS Redis detectado - usando fallback');
-      }
-    });
-    
-    return redis;
-    
-  } catch (error: any) {
-    console.warn('⚠️ Falha ao conectar Redis:', error.message);
-    console.log('🔄 Usando Redis Mock (cache em memória local)');
-    return new RedisMock();
-  }
-}
-
-// Variável para armazenar instância Redis
-let redisInstance: Redis | RedisMock | null = null;
-
-// Função para obter instância Redis
-export async function getRedis(): Promise<Redis | RedisMock> {
-  if (!redisInstance) {
-    redisInstance = await createRedisConnection();
-  }
-  return redisInstance;
-}
-
-// Instância global para compatibilidade (sem top-level await)
-export const redis = globalForRedis.redis ?? new Redis(config.redis.url, {
-  maxRetriesPerRequest: 1,
-  enableReadyCheck: false,
-  lazyConnect: true,
-  connectTimeout: 5000,
-  commandTimeout: 3000,
+redis.on('end', () => {
+  console.log('🔚 Conexão Redis externo encerrada');
 });
 
 if (config.server.isDevelopment) globalForRedis.redis = redis;
 
-// Função para testar conexão (sempre retorna true com fallback)
+// Função para testar conexão
 export async function testRedisConnection(): Promise<boolean> {
   try {
-    const redisClient = await getRedis();
-    await redisClient.ping();
+    console.log('🔍 Testando conexão Redis externo...');
+    const result = await redis.ping();
     
-    if (redisClient instanceof RedisMock) {
-      console.log('✅ Redis Mock ativo - funcionalidade limitada mas operacional');
+    if (result === 'PONG') {
+      console.log('✅ Redis externo respondeu: PONG');
+      return true;
     } else {
-      console.log('✅ Redis real conectado com sucesso');
+      console.error('❌ Redis externo resposta inesperada:', result);
+      return false;
     }
-    
-    return true;
-  } catch (error) {
-    console.error('❌ Erro crítico no Redis:', error);
+  } catch (error: any) {
+    console.error('❌ Erro ao testar Redis externo:', error.message);
     return false;
   }
 }
@@ -157,21 +90,18 @@ export async function testRedisConnection(): Promise<boolean> {
 // Função para desconectar
 export async function disconnectRedis(): Promise<void> {
   try {
-    if (redisInstance) {
-      await redisInstance.disconnect();
-      console.log('✅ Redis desconectado com sucesso');
-    }
+    await redis.disconnect();
+    console.log('✅ Redis externo desconectado com sucesso');
   } catch (error) {
-    console.error('❌ Erro ao desconectar Redis:', error);
+    console.error('❌ Erro ao desconectar Redis externo:', error);
   }
 }
 
-// Utilitários para cache com fallback automático
+// Utilitários para cache
 export const cache = {
   async get<T>(key: string): Promise<T | null> {
     try {
-      const redisClient = await getRedis();
-      const value = await redisClient.get(key);
+      const value = await redis.get(key);
       return value ? JSON.parse(value) : null;
     } catch (error) {
       console.error('❌ Erro ao buscar cache:', error);
@@ -181,8 +111,7 @@ export const cache = {
 
   async set(key: string, value: any, ttl: number = 3600): Promise<boolean> {
     try {
-      const redisClient = await getRedis();
-      await redisClient.setex(key, ttl, JSON.stringify(value));
+      await redis.setex(key, ttl, JSON.stringify(value));
       return true;
     } catch (error) {
       console.error('❌ Erro ao salvar cache:', error);
@@ -192,8 +121,7 @@ export const cache = {
 
   async del(key: string): Promise<boolean> {
     try {
-      const redisClient = await getRedis();
-      await redisClient.del(key);
+      await redis.del(key);
       return true;
     } catch (error) {
       console.error('❌ Erro ao deletar cache:', error);
@@ -203,8 +131,7 @@ export const cache = {
 
   async exists(key: string): Promise<boolean> {
     try {
-      const redisClient = await getRedis();
-      const result = await redisClient.exists(key);
+      const result = await redis.exists(key);
       return result === 1;
     } catch (error) {
       console.error('❌ Erro ao verificar cache:', error);
@@ -213,11 +140,21 @@ export const cache = {
   }
 };
 
-// Inicialização automática sem top-level await
+// Inicialização automática
 export function initializeRedis(): void {
   if (!config.server.isTest) {
-    console.log('🚀 Inicializando sistema de cache...');
-    testRedisConnection().catch(console.error);
+    console.log('🚀 Inicializando Redis externo...');
+    testRedisConnection()
+      .then(success => {
+        if (success) {
+          console.log('🎉 Redis externo inicializado com sucesso!');
+        } else {
+          console.error('💥 Falha na inicialização do Redis externo');
+        }
+      })
+      .catch(error => {
+        console.error('💥 Erro crítico na inicialização Redis:', error);
+      });
   }
 }
 
