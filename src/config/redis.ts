@@ -31,8 +31,8 @@ const redisConfig = {
   // Configurações de família de endereços (força IPv4)
   family: 4,
   
-  // Configurações de keep-alive
-  keepAlive: true,
+  // Configurações de keep-alive (corrigido para number)
+  keepAlive: 30000,             // 30 segundos
   keepAliveInitialDelay: 0,
   
   // Configurações adicionais para estabilidade
@@ -52,7 +52,7 @@ redis.on('ready', () => {
   console.log('✅ Redis pronto para uso');
 });
 
-redis.on('error', (err) => {
+redis.on('error', (err: Error) => {
   console.error('❌ Erro Redis:', err.message);
   // Log adicional para problemas de DNS
   if (err.message.includes('ENOTFOUND')) {
@@ -64,7 +64,7 @@ redis.on('close', () => {
   console.log('⚠️ Conexão Redis fechada');
 });
 
-redis.on('reconnecting', (ms) => {
+redis.on('reconnecting', (ms: number) => {
   console.log(`🔄 Reconectando Redis em ${ms}ms`);
 });
 
