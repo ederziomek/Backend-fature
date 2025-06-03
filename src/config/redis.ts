@@ -113,8 +113,8 @@ async function createRedisConnection(): Promise<Redis | RedisMock> {
   }
 }
 
-// Inicializar Redis com fallback
-let redisInstance: Redis | RedisMock;
+// Variável para armazenar instância Redis
+let redisInstance: Redis | RedisMock | null = null;
 
 // Função para obter instância Redis
 export async function getRedis(): Promise<Redis | RedisMock> {
@@ -124,10 +124,16 @@ export async function getRedis(): Promise<Redis | RedisMock> {
   return redisInstance;
 }
 
-// Instância global para compatibilidade
-export const redis = globalForRedis.redis ?? await getRedis();
+// Instância global para compatibilidade (sem top-level await)
+export const redis = globalForRedis.redis ?? new Redis(config.redis.url, {
+  maxRetriesPerRequest: 1,
+  enableReadyCheck: false,
+  lazyConnect: true,
+  connectTimeout: 5000,
+  commandTimeout: 3000,
+});
 
-if (config.server.isDevelopment) globalForRedis.redis = redis as Redis;
+if (config.server.isDevelopment) globalForRedis.redis = redis;
 
 // Função para testar conexão (sempre retorna true com fallback)
 export async function testRedisConnection(): Promise<boolean> {
@@ -207,11 +213,14 @@ export const cache = {
   }
 };
 
-// Inicialização automática silenciosa
-(async () => {
+// Inicialização automática sem top-level await
+export function initializeRedis(): void {
   if (!config.server.isTest) {
     console.log('🚀 Inicializando sistema de cache...');
-    await testRedisConnection();
+    testRedisConnection().catch(console.error);
   }
-})();
+}
+
+// Chama inicialização
+initializeRedis();
 
