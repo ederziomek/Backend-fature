@@ -252,7 +252,7 @@ export class UserManagementService {
         }
       });
 
-      return admins.map(admin => ({
+      return admins.map((admin: any) => ({
         id: admin.id,
         email: admin.email,
         name: admin.name,

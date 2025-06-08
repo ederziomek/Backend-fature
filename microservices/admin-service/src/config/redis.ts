@@ -11,7 +11,6 @@ export const redis = new Redis({
   port: adminConfig.redis.port,
   password: adminConfig.redis.password || undefined,
   db: adminConfig.redis.db,
-  retryDelayOnFailover: 100,
   enableReadyCheck: false,
   maxRetriesPerRequest: 3,
   lazyConnect: true,

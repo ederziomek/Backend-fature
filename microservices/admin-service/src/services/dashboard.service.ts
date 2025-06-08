@@ -388,7 +388,7 @@ export class DashboardService {
         take: 10
       });
 
-      return alerts.map(alert => ({
+      return alerts.map((alert: any) => ({
         id: alert.id,
         type: alert.type as any,
         title: alert.title,
