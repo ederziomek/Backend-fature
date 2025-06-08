@@ -154,3 +154,67 @@ export interface AuditLogData {
   severity: 'debug' | 'info' | 'warning' | 'error' | 'critical';
 }
 
+
+// Tipos de eventos específicos
+export interface UserCreatedEvent {
+  userId: string;
+  email: string;
+  name: string;
+  timestamp: Date;
+  metadata?: any;
+}
+
+export interface UserLoginEvent {
+  userId: string;
+  email: string;
+  name: string;
+  timestamp: Date;
+  ipAddress?: string;
+  userAgent?: string;
+  deviceFingerprint?: string;
+}
+
+export interface UserLogoutEvent {
+  userId: string;
+  sessionId: string;
+  timestamp: Date;
+  ipAddress?: string;
+}
+
+export interface UserUpdatedEvent {
+  userId: string;
+  email: string;
+  name: string;
+  timestamp: Date;
+  changes: string[];
+  metadata?: any;
+}
+
+export interface SessionCreatedEvent {
+  sessionId: string;
+  userId: string;
+  timestamp: Date;
+  ipAddress?: string;
+  userAgent?: string;
+  deviceFingerprint?: string;
+}
+
+export interface SessionExpiredEvent {
+  sessionId: string;
+  userId: string;
+  timestamp: Date;
+  reason: 'timeout' | 'logout' | 'revoked';
+}
+
+export interface SecurityAlertEvent {
+  userId: string;
+  alertType: 'suspicious_login' | 'multiple_failed_attempts' | 'unusual_activity';
+  timestamp: Date;
+  details: any;
+  ipAddress?: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+}
+
+// Tipos de auditoria
+export type AuditLogSeverity = 'debug' | 'info' | 'warning' | 'error' | 'critical';
+
