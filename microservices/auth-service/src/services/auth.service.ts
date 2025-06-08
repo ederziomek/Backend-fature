@@ -356,12 +356,12 @@ export class AuthService {
         id: user.id,
         email: user.email,
         name: user.name,
-        phone: user.phone,
-        document: user.document,
+        phone: user.phone || undefined,
+        document: user.document || undefined,
         status: user.status,
-        emailVerifiedAt: user.emailVerifiedAt,
-        phoneVerifiedAt: user.phoneVerifiedAt,
-        lastLoginAt: user.lastLoginAt,
+        emailVerifiedAt: user.emailVerifiedAt || undefined,
+        phoneVerifiedAt: user.phoneVerifiedAt || undefined,
+        lastLoginAt: user.lastLoginAt || undefined,
         mfaEnabled: user.mfaEnabled,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
@@ -405,6 +405,166 @@ export class AuthService {
   }
 
   /**
+   * Faz logout de todas as sessões de um usuário
+   */
+  static async logoutAll(userId: string, ipAddress?: string): Promise<void> {
+    // Buscar todas as sessões ativas do usuário
+    const activeSessions = await prisma.userSession.findMany({
+      where: {
+        userId,
+        status: 'active'
+      }
+    });
+
+    // Revogar todas as sessões no banco
+    await prisma.userSession.updateMany({
+      where: {
+        userId,
+        status: 'active'
+      },
+      data: { status: 'revoked' }
+    });
+
+    // Remover todas as sessões do Redis
+    for (const session of activeSessions) {
+      await sessionUtils.deleteSession(session.id);
+    }
+
+    // Log de auditoria
+    await AuditService.log({
+      userId,
+      action: 'user.logout_all',
+      resource: 'session',
+      details: { sessionCount: activeSessions.length },
+      ipAddress: ipAddress || '',
+      severity: 'info'
+    });
+
+    // Publicar evento
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (user) {
+      await EventService.publishUserLogoutAll({
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        timestamp: new Date(),
+        sessionCount: activeSessions.length
+      });
+    }
+  }
+
+  /**
+   * Altera a senha do usuário
+   */
+  static async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+    ipAddress?: string,
+    userAgent?: string
+  ): Promise<void> {
+    // Buscar usuário
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new Error('Usuário não encontrado');
+    }
+
+    // Verificar senha atual
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isCurrentPasswordValid) {
+      throw new Error('Senha atual incorreta');
+    }
+
+    // Verificar se nova senha é diferente da atual
+    const isSamePassword = await bcrypt.compare(newPassword, user.passwordHash);
+    if (isSamePassword) {
+      throw new Error('A nova senha deve ser diferente da senha atual');
+    }
+
+    // Hash da nova senha
+    const newPasswordHash = await bcrypt.hash(newPassword, config.security.bcryptRounds);
+
+    // Atualizar senha
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash: newPasswordHash
+      }
+    });
+
+    // Revogar todas as sessões ativas (forçar novo login)
+    await this.logoutAll(userId, ipAddress);
+
+    // Log de auditoria
+    await AuditService.log({
+      userId,
+      action: 'user.password_changed',
+      resource: 'user',
+      ipAddress: ipAddress || '',
+      userAgent: userAgent || '',
+      severity: 'info'
+    });
+
+    // Publicar evento
+    await EventService.publishPasswordChanged({
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      timestamp: new Date()
+    });
+  }
+
+  /**
+   * Inicia processo de recuperação de senha
+   */
+  static async forgotPassword(email: string, ipAddress?: string): Promise<void> {
+    // Buscar usuário
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() }
+    });
+
+    // Sempre retornar sucesso para não vazar informações
+    if (!user) {
+      return;
+    }
+
+    // Log de auditoria
+    await AuditService.log({
+      userId: user.id,
+      action: 'user.password_reset_requested',
+      resource: 'user',
+      ipAddress: ipAddress || '',
+      severity: 'info'
+    });
+
+    // Por enquanto, apenas logamos o evento
+    // Em produção, aqui seria enviado um email com link de reset
+    console.log(`Password reset requested for user ${user.email}`);
+  }
+
+  /**
+   * Redefine a senha usando token de reset
+   * Implementação simplificada - em produção seria usado token real
+   */
+  static async resetPassword(
+    token: string,
+    newPassword: string,
+    ipAddress?: string
+  ): Promise<void> {
+    // Implementação simplificada - em produção validaria token real
+    throw new Error('Funcionalidade de reset de senha será implementada com sistema de email');
+  }
+
+  /**
+   * Verifica email usando token de verificação
+   * Implementação simplificada - em produção seria usado token real
+   */
+  static async verifyEmail(token: string): Promise<void> {
+    // Implementação simplificada - em produção validaria token real
+    throw new Error('Funcionalidade de verificação de email será implementada com sistema de email');
+  }
+
+  /**
    * Converte string de tempo para milissegundos
    */
   private static parseTimeToMs(timeStr: string): number {
@@ -414,14 +574,15 @@ export class AuthService {
       'h': 60 * 60 * 1000,
       'd': 24 * 60 * 60 * 1000
     };
-
     const match = timeStr.match(/^(\d+)([smhd])$/);
     if (!match) {
       throw new Error(`Formato de tempo inválido: ${timeStr}`);
     }
-
     const [, value, unit] = match;
-    return parseInt(value) * units[unit];
+    if (!value || !unit) {
+      throw new Error(`Formato de tempo inválido: ${timeStr}`);
+    }
+    return parseInt(value) * (units[unit] || 1000);
   }
 }
 

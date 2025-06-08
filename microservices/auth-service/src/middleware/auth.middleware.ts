@@ -130,7 +130,7 @@ export async function authMiddleware(
       resource: 'authentication',
       details: { error: error.message },
       ipAddress: request.ip,
-      userAgent: request.headers['user-agent'],
+      userAgent: request.headers['user-agent'] || '',
       severity: 'error'
     });
 

@@ -57,7 +57,13 @@ export class AuthController {
       const userAgent = request.headers['user-agent'];
 
       const authResponse = await AuthService.register(
-        { email, password, name, phone, document },
+        { 
+          email, 
+          password, 
+          name, 
+          phone: phone || '', 
+          document: document || '' 
+        },
         ipAddress,
         userAgent
       );
@@ -101,7 +107,12 @@ export class AuthController {
       const userAgent = request.headers['user-agent'];
 
       const authResponse = await AuthService.login(
-        { email, password, deviceFingerprint, rememberMe },
+        { 
+          email, 
+          password, 
+          deviceFingerprint: deviceFingerprint || '', 
+          rememberMe: rememberMe || false 
+        },
         ipAddress,
         userAgent
       );
@@ -143,11 +154,7 @@ export class AuthController {
       const ipAddress = request.ip;
       const userAgent = request.headers['user-agent'];
 
-      const authResponse = await AuthService.refreshToken(
-        refreshToken,
-        ipAddress,
-        userAgent
-      );
+      const authResponse = await AuthService.refreshToken(refreshToken);
 
       return reply.status(200).send({
         success: true,

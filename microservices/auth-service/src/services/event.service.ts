@@ -131,6 +131,117 @@ class EventServiceClass extends EventEmitter {
   }
 
   /**
+   * Publica evento de logout de todas as sessões
+   */
+  async publishUserLogoutAll(event: {
+    userId: string;
+    email: string;
+    name: string;
+    timestamp: Date;
+    sessionCount: number;
+  }): Promise<void> {
+    try {
+      this.emit('user.logout_all', event);
+      
+      // Integração com sistema de mensageria
+      // await this.publishToMessageBroker('user.logout_all', event);
+      
+      console.log('Event published: user.logout_all', { 
+        userId: event.userId,
+        sessionCount: event.sessionCount 
+      });
+    } catch (error) {
+      console.error('Erro ao publicar evento user.logout_all:', error);
+    }
+  }
+
+  /**
+   * Publica evento de alteração de senha
+   */
+  async publishPasswordChanged(event: {
+    userId: string;
+    email: string;
+    name: string;
+    timestamp: Date;
+  }): Promise<void> {
+    try {
+      this.emit('user.password_changed', event);
+      
+      // Integração com sistema de mensageria
+      // await this.publishToMessageBroker('user.password_changed', event);
+      
+      console.log('Event published: user.password_changed', { userId: event.userId });
+    } catch (error) {
+      console.error('Erro ao publicar evento user.password_changed:', error);
+    }
+  }
+
+  /**
+   * Publica evento de solicitação de reset de senha
+   */
+  async publishPasswordResetRequested(event: {
+    userId: string;
+    email: string;
+    name: string;
+    resetToken: string;
+    expiresAt: Date;
+    timestamp: Date;
+  }): Promise<void> {
+    try {
+      this.emit('user.password_reset_requested', event);
+      
+      // Integração com sistema de mensageria
+      // await this.publishToMessageBroker('user.password_reset_requested', event);
+      
+      console.log('Event published: user.password_reset_requested', { userId: event.userId });
+    } catch (error) {
+      console.error('Erro ao publicar evento user.password_reset_requested:', error);
+    }
+  }
+
+  /**
+   * Publica evento de reset de senha completado
+   */
+  async publishPasswordResetCompleted(event: {
+    userId: string;
+    email: string;
+    name: string;
+    timestamp: Date;
+  }): Promise<void> {
+    try {
+      this.emit('user.password_reset_completed', event);
+      
+      // Integração com sistema de mensageria
+      // await this.publishToMessageBroker('user.password_reset_completed', event);
+      
+      console.log('Event published: user.password_reset_completed', { userId: event.userId });
+    } catch (error) {
+      console.error('Erro ao publicar evento user.password_reset_completed:', error);
+    }
+  }
+
+  /**
+   * Publica evento de email verificado
+   */
+  async publishEmailVerified(event: {
+    userId: string;
+    email: string;
+    name: string;
+    timestamp: Date;
+  }): Promise<void> {
+    try {
+      this.emit('user.email_verified', event);
+      
+      // Integração com sistema de mensageria
+      // await this.publishToMessageBroker('user.email_verified', event);
+      
+      console.log('Event published: user.email_verified', { userId: event.userId });
+    } catch (error) {
+      console.error('Erro ao publicar evento user.email_verified:', error);
+    }
+  }
+
+  /**
    * Registra listener para eventos
    */
   onUserCreated(callback: (event: UserCreatedEvent) => void): void {
