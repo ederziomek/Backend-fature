@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { AffiliateController } from '@/controllers/affiliate.controller';
+import { AdvancedAffiliateController } from '@/controllers/advanced.controller';
 import { authMiddleware } from '@/middleware/auth.middleware';
 
 export async function affiliateRoutes(fastify: FastifyInstance) {
@@ -290,7 +291,7 @@ export async function affiliateRoutes(fastify: FastifyInstance) {
         }
       },
       preHandler: [authMiddleware]
-    }, AffiliateController.getMLMStructure);
+    }, AdvancedAffiliateController.getMLMStructure);
 
     // Processar transação e calcular comissões CPA
     fastify.post('/affiliates/process-transaction', {
@@ -373,7 +374,7 @@ export async function affiliateRoutes(fastify: FastifyInstance) {
         }
       },
       preHandler: [authMiddleware]
-    }, AffiliateController.generateReport);
+    }, AdvancedAffiliateController.generateReport);
 
     // Obter filhos diretos (1º nível)
     fastify.get('/affiliates/:id/children', {
@@ -434,6 +435,463 @@ export async function affiliateRoutes(fastify: FastifyInstance) {
       },
       preHandler: [authMiddleware]
     }, AffiliateController.updateActivity);
+  });
+}
+
+
+    // ===============================================
+    // ROTAS AVANÇADAS - REVSHARE
+    // ===============================================
+
+    // Calcular RevShare para período específico
+    fastify.post('/affiliates/:id/revshare/calculate', {
+      schema: {
+        tags: ['RevShare'],
+        summary: 'Calcular RevShare',
+        description: 'Calcula RevShare para um afiliado em período específico',
+        params: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'ID do afiliado' }
+          },
+          required: ['id']
+        },
+        body: {
+          type: 'object',
+          required: ['period'],
+          properties: {
+            period: {
+              type: 'object',
+              properties: {
+                type: { type: 'string', enum: ['weekly', 'monthly', 'custom'] },
+                startDate: { type: 'string', format: 'date' },
+                endDate: { type: 'string', format: 'date' }
+              },
+              required: ['type']
+            }
+          }
+        },
+        response: {
+          200: {
+            description: 'RevShare calculado',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean', example: true },
+              data: { type: 'object' },
+              statusCode: { type: 'number', example: 200 }
+            }
+          }
+        }
+      },
+      preHandler: [authMiddleware]
+    }, AdvancedAdvancedAffiliateController.calculateRevShare);
+
+    // Processar RevShare automático
+    fastify.post('/affiliates/revshare/process-automatic', {
+      schema: {
+        tags: ['RevShare'],
+        summary: 'Processar RevShare automático',
+        description: 'Processa RevShare automaticamente para todos os afiliados',
+        body: {
+          type: 'object',
+          required: ['period'],
+          properties: {
+            period: {
+              type: 'object',
+              properties: {
+                type: { type: 'string', enum: ['weekly', 'monthly'] }
+              },
+              required: ['type']
+            }
+          }
+        },
+        response: {
+          200: {
+            description: 'Processamento iniciado',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean', example: true },
+              message: { type: 'string', example: 'Processamento iniciado' },
+              statusCode: { type: 'number', example: 200 }
+            }
+          }
+        }
+      },
+      preHandler: [authMiddleware]
+    }, AdvancedAffiliateController.processAutomaticRevShare);
+
+    // ===============================================
+    // ROTAS AVANÇADAS - GAMIFICAÇÃO
+    // ===============================================
+
+    // Processar sequência diária
+    fastify.post('/affiliates/:id/sequence/process', {
+      schema: {
+        tags: ['Gamificação'],
+        summary: 'Processar sequência',
+        description: 'Processa sequência diária de indicações do afiliado',
+        params: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'ID do afiliado' }
+          },
+          required: ['id']
+        },
+        response: {
+          200: {
+            description: 'Sequência processada',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean', example: true },
+              data: { type: 'object' },
+              statusCode: { type: 'number', example: 200 }
+            }
+          }
+        }
+      },
+      preHandler: [authMiddleware]
+    }, AdvancedAffiliateController.processSequence);
+
+    // Gerar baú de recompensa
+    fastify.post('/affiliates/:id/chest/generate', {
+      schema: {
+        tags: ['Gamificação'],
+        summary: 'Gerar baú',
+        description: 'Gera baú de recompensa para o afiliado',
+        params: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'ID do afiliado' }
+          },
+          required: ['id']
+        },
+        body: {
+          type: 'object',
+          required: ['trigger'],
+          properties: {
+            trigger: { 
+              type: 'string', 
+              enum: ['level_up', 'milestone', 'sequence', 'manual'],
+              description: 'Trigger que gerou o baú' 
+            }
+          }
+        },
+        response: {
+          200: {
+            description: 'Baú gerado',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean', example: true },
+              data: { type: 'object' },
+              statusCode: { type: 'number', example: 200 }
+            }
+          }
+        }
+      },
+      preHandler: [authMiddleware]
+    }, AdvancedAffiliateController.generateChest);
+
+    // Abrir baú de recompensa
+    fastify.post('/affiliates/:id/chest/:chestId/open', {
+      schema: {
+        tags: ['Gamificação'],
+        summary: 'Abrir baú',
+        description: 'Abre baú de recompensa do afiliado',
+        params: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'ID do afiliado' },
+            chestId: { type: 'string', description: 'ID do baú' }
+          },
+          required: ['id', 'chestId']
+        },
+        response: {
+          200: {
+            description: 'Baú aberto',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean', example: true },
+              data: { type: 'object' },
+              statusCode: { type: 'number', example: 200 }
+            }
+          }
+        }
+      },
+      preHandler: [authMiddleware]
+    }, AdvancedAffiliateController.openChest);
+
+    // Listar baús disponíveis
+    fastify.get('/affiliates/:id/chests', {
+      schema: {
+        tags: ['Gamificação'],
+        summary: 'Listar baús',
+        description: 'Lista baús disponíveis do afiliado',
+        params: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'ID do afiliado' }
+          },
+          required: ['id']
+        },
+        querystring: {
+          type: 'object',
+          properties: {
+            status: { 
+              type: 'string', 
+              enum: ['available', 'opened', 'expired'],
+              description: 'Filtrar por status' 
+            }
+          }
+        },
+        response: {
+          200: {
+            description: 'Lista de baús',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean', example: true },
+              data: { type: 'array' },
+              statusCode: { type: 'number', example: 200 }
+            }
+          }
+        }
+      },
+      preHandler: [authMiddleware]
+    }, AdvancedAffiliateController.listChests);
+
+    // ===============================================
+    // ROTAS AVANÇADAS - RELATÓRIOS
+    // ===============================================
+
+    // Gerar relatório de performance
+    fastify.post('/affiliates/:id/reports/performance', {
+      schema: {
+        tags: ['Relatórios'],
+        summary: 'Relatório de performance',
+        description: 'Gera relatório detalhado de performance do afiliado',
+        params: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'ID do afiliado' }
+          },
+          required: ['id']
+        },
+        body: {
+          type: 'object',
+          required: ['startDate', 'endDate', 'format'],
+          properties: {
+            startDate: { type: 'string', format: 'date', description: 'Data inicial' },
+            endDate: { type: 'string', format: 'date', description: 'Data final' },
+            format: { 
+              type: 'string', 
+              enum: ['pdf', 'excel', 'csv', 'json'],
+              description: 'Formato do relatório' 
+            }
+          }
+        },
+        response: {
+          200: {
+            description: 'Relatório gerado',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean', example: true },
+              data: { type: 'object' },
+              statusCode: { type: 'number', example: 200 }
+            }
+          }
+        }
+      },
+      preHandler: [authMiddleware]
+    }, AdvancedAffiliateController.generatePerformanceReport);
+
+    // Gerar relatório de comissões
+    fastify.post('/affiliates/:id/reports/commissions', {
+      schema: {
+        tags: ['Relatórios'],
+        summary: 'Relatório de comissões',
+        description: 'Gera relatório detalhado de comissões do afiliado',
+        params: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'ID do afiliado' }
+          },
+          required: ['id']
+        },
+        body: {
+          type: 'object',
+          required: ['startDate', 'endDate', 'format'],
+          properties: {
+            startDate: { type: 'string', format: 'date', description: 'Data inicial' },
+            endDate: { type: 'string', format: 'date', description: 'Data final' },
+            format: { 
+              type: 'string', 
+              enum: ['pdf', 'excel', 'csv', 'json'],
+              description: 'Formato do relatório' 
+            },
+            type: {
+              type: 'string',
+              enum: ['all', 'cpa', 'revshare'],
+              description: 'Tipo de comissão'
+            }
+          }
+        },
+        response: {
+          200: {
+            description: 'Relatório gerado',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean', example: true },
+              data: { type: 'object' },
+              statusCode: { type: 'number', example: 200 }
+            }
+          }
+        }
+      },
+      preHandler: [authMiddleware]
+    }, AdvancedAffiliateController.generateCommissionReport);
+
+    // Gerar relatório de rede
+    fastify.post('/affiliates/:id/reports/network', {
+      schema: {
+        tags: ['Relatórios'],
+        summary: 'Relatório de rede',
+        description: 'Gera relatório da estrutura de rede MLM do afiliado',
+        params: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'ID do afiliado' }
+          },
+          required: ['id']
+        },
+        body: {
+          type: 'object',
+          required: ['startDate', 'endDate', 'format'],
+          properties: {
+            startDate: { type: 'string', format: 'date', description: 'Data inicial' },
+            endDate: { type: 'string', format: 'date', description: 'Data final' },
+            format: { 
+              type: 'string', 
+              enum: ['pdf', 'excel', 'json'],
+              description: 'Formato do relatório' 
+            },
+            levels: {
+              type: 'number',
+              minimum: 1,
+              maximum: 5,
+              description: 'Número de níveis para incluir'
+            }
+          }
+        },
+        response: {
+          200: {
+            description: 'Relatório gerado',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean', example: true },
+              data: { type: 'object' },
+              statusCode: { type: 'number', example: 200 }
+            }
+          }
+        }
+      },
+      preHandler: [authMiddleware]
+    }, AdvancedAffiliateController.generateNetworkReport);
+
+    // Download de relatório
+    fastify.get('/affiliates/reports/:reportId/download', {
+      schema: {
+        tags: ['Relatórios'],
+        summary: 'Download de relatório',
+        description: 'Faz download de relatório gerado',
+        params: {
+          type: 'object',
+          properties: {
+            reportId: { type: 'string', description: 'ID do relatório' }
+          },
+          required: ['reportId']
+        },
+        response: {
+          200: {
+            description: 'Arquivo do relatório',
+            type: 'string',
+            format: 'binary'
+          }
+        }
+      },
+      preHandler: [authMiddleware]
+    }, AdvancedAffiliateController.downloadReport);
+
+    // ===============================================
+    // ROTAS AVANÇADAS - WEBHOOKS
+    // ===============================================
+
+    // Configurar webhook
+    fastify.post('/affiliates/:id/webhooks', {
+      schema: {
+        tags: ['Webhooks'],
+        summary: 'Configurar webhook',
+        description: 'Configura webhook para eventos do afiliado',
+        params: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'ID do afiliado' }
+          },
+          required: ['id']
+        },
+        body: {
+          type: 'object',
+          required: ['url', 'events'],
+          properties: {
+            url: { type: 'string', format: 'uri', description: 'URL do webhook' },
+            events: { 
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Eventos para notificar'
+            },
+            secret: { type: 'string', description: 'Secret para validação' }
+          }
+        },
+        response: {
+          201: {
+            description: 'Webhook configurado',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean', example: true },
+              data: { type: 'object' },
+              statusCode: { type: 'number', example: 201 }
+            }
+          }
+        }
+      },
+      preHandler: [authMiddleware]
+    }, AdvancedAffiliateController.configureWebhook);
+
+    // Listar webhooks
+    fastify.get('/affiliates/:id/webhooks', {
+      schema: {
+        tags: ['Webhooks'],
+        summary: 'Listar webhooks',
+        description: 'Lista webhooks configurados para o afiliado',
+        params: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'ID do afiliado' }
+          },
+          required: ['id']
+        },
+        response: {
+          200: {
+            description: 'Lista de webhooks',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean', example: true },
+              data: { type: 'array' },
+              statusCode: { type: 'number', example: 200 }
+            }
+          }
+        }
+      },
+      preHandler: [authMiddleware]
+    }, AdvancedAffiliateController.listWebhooks);
   });
 }
 
