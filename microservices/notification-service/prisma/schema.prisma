@@ -1,0 +1,192 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model NotificationTemplate {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  type        NotificationType
+  subject     String?  // Para emails
+  content     String   @db.Text
+  variables   String[] // Array de variáveis disponíveis no template
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relacionamentos
+  notifications NotificationLog[]
+  
+  @@map("notification_templates")
+}
+
+model NotificationPreference {
+  id         String                   @id @default(cuid())
+  userId     String                   @unique
+  email      Boolean                  @default(true)
+  sms        Boolean                  @default(false)
+  push       Boolean                  @default(true)
+  categories NotificationCategory[]
+  createdAt  DateTime                 @default(now())
+  updatedAt  DateTime                 @updatedAt
+  
+  @@map("notification_preferences")
+}
+
+model NotificationLog {
+  id           String               @id @default(cuid())
+  userId       String
+  type         NotificationType
+  category     NotificationCategory
+  templateId   String
+  recipient    String               // Email, telefone ou endpoint push
+  status       NotificationStatus   @default(PENDING)
+  priority     NotificationPriority @default(NORMAL)
+  sentAt       DateTime?
+  deliveredAt  DateTime?
+  errorMessage String?              @db.Text
+  metadata     Json?                // Dados adicionais como variáveis usadas
+  retryCount   Int                  @default(0)
+  scheduledFor DateTime?            // Para notificações agendadas
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  
+  // Relacionamentos
+  template NotificationTemplate @relation(fields: [templateId], references: [id])
+  
+  @@map("notification_logs")
+  @@index([userId])
+  @@index([status])
+  @@index([category])
+  @@index([scheduledFor])
+  @@index([createdAt])
+}
+
+model NotificationQueue {
+  id           String               @id @default(cuid())
+  userId       String
+  type         NotificationType
+  category     NotificationCategory
+  templateId   String
+  recipient    String
+  variables    Json
+  priority     NotificationPriority @default(NORMAL)
+  scheduledFor DateTime?
+  attempts     Int                  @default(0)
+  maxAttempts  Int                  @default(3)
+  lastError    String?              @db.Text
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  
+  @@map("notification_queue")
+  @@index([scheduledFor])
+  @@index([priority])
+  @@index([attempts])
+}
+
+model NotificationStats {
+  id           String               @id @default(cuid())
+  date         DateTime             @db.Date
+  category     NotificationCategory
+  type         NotificationType
+  totalSent    Int                  @default(0)
+  totalDelivered Int               @default(0)
+  totalFailed  Int                  @default(0)
+  deliveryRate Float                @default(0)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  
+  @@unique([date, category, type])
+  @@map("notification_stats")
+  @@index([date])
+  @@index([category])
+}
+
+model NotificationWebhook {
+  id          String   @id @default(cuid())
+  url         String
+  events      NotificationCategory[]
+  isActive    Boolean  @default(true)
+  secret      String?  // Para validação HMAC
+  retryCount  Int      @default(3)
+  timeout     Int      @default(10000) // em millisegundos
+  lastSuccess DateTime?
+  lastError   String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("notification_webhooks")
+}
+
+model NotificationBatch {
+  id          String               @id @default(cuid())
+  name        String
+  type        NotificationType
+  category    NotificationCategory
+  templateId  String
+  userIds     String[]
+  variables   Json
+  status      BatchStatus          @default(PENDING)
+  totalUsers  Int
+  processed   Int                  @default(0)
+  successful  Int                  @default(0)
+  failed      Int                  @default(0)
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  
+  @@map("notification_batches")
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Enums
+enum NotificationType {
+  EMAIL
+  SMS
+  PUSH
+}
+
+enum NotificationCategory {
+  WELCOME
+  CPA_COMMISSION
+  REVSHARE_COMMISSION
+  LEVEL_UP
+  RANKING_UPDATE
+  SECURITY_ALERT
+  SYSTEM_MAINTENANCE
+  PROMOTIONAL
+  REMINDER
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  CANCELLED
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum BatchStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
