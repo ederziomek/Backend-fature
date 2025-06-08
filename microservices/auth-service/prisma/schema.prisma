@@ -1,0 +1,118 @@
+// Schema do Prisma para o microsserviço de autenticação
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum UserStatus {
+  pending
+  active
+  inactive
+  suspended
+  banned
+}
+
+enum SessionStatus {
+  active
+  expired
+  revoked
+}
+
+enum LogSeverity {
+  debug
+  info
+  warning
+  error
+  critical
+}
+
+// Tabela de usuários
+model User {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email             String    @unique @db.VarChar(255)
+  passwordHash      String    @map("password_hash") @db.VarChar(255)
+  name              String    @db.VarChar(255)
+  phone             String?   @db.VarChar(20)
+  document          String?   @unique @db.VarChar(20)
+  status            UserStatus @default(pending)
+  emailVerifiedAt   DateTime? @map("email_verified_at")
+  phoneVerifiedAt   DateTime? @map("phone_verified_at")
+  lastLoginAt       DateTime? @map("last_login_at")
+  lastLoginIp       String?   @map("last_login_ip") @db.Inet
+  failedLoginAttempts Int     @default(0) @map("failed_login_attempts")
+  lockedUntil       DateTime? @map("locked_until")
+  mfaSecret         String?   @map("mfa_secret") @db.VarChar(255)
+  mfaEnabled        Boolean   @default(false) @map("mfa_enabled")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
+
+  // Relacionamentos
+  sessions          UserSession[]
+  auditLogs         AuditLog[]
+
+  @@map("users")
+}
+
+// Tabela de sessões
+model UserSession {
+  id                String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String        @map("user_id") @db.Uuid
+  sessionToken      String        @unique @map("session_token") @db.VarChar(255)
+  refreshToken      String?       @unique @map("refresh_token") @db.VarChar(255)
+  deviceFingerprint String?       @map("device_fingerprint") @db.VarChar(255)
+  ipAddress         String?       @map("ip_address") @db.Inet
+  userAgent         String?       @map("user_agent") @db.Text
+  location          Json?         @map("location")
+  status            SessionStatus @default(active)
+  expiresAt         DateTime      @map("expires_at")
+  refreshExpiresAt  DateTime?     @map("refresh_expires_at")
+  lastUsedAt        DateTime      @default(now()) @map("last_used_at")
+  createdAt         DateTime      @default(now()) @map("created_at")
+
+  // Relacionamentos
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+// Tabela de logs de auditoria
+model AuditLog {
+  id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String?     @map("user_id") @db.Uuid
+  action     String      @db.VarChar(255)
+  resource   String      @db.VarChar(255)
+  resourceId String?     @map("resource_id") @db.VarChar(255)
+  details    Json?
+  ipAddress  String?     @map("ip_address") @db.Inet
+  userAgent  String?     @map("user_agent") @db.Text
+  severity   LogSeverity @default(info)
+  timestamp  DateTime    @default(now())
+
+  // Relacionamentos
+  user       User?       @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+// Tabela de tokens de verificação
+model VerificationToken {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  token     String   @unique @db.VarChar(255)
+  type      String   @db.VarChar(50) // email_verification, password_reset, etc.
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("verification_tokens")
+}
+
+// Índices adicionais para performance
+// Os índices básicos são criados automaticamente pelo Prisma para chaves primárias e únicas
+
