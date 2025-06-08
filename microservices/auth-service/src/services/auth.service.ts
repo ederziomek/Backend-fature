@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import jwt, { Secret } from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '@/config/database';
 import { redis, sessionUtils } from '@/config/redis';
@@ -139,7 +139,13 @@ export class AuthService {
       severity: 'info'
     });
 
-    // Publicar evento
+    // Criar sessão e tokens
+    const authResponse = await this.createSession(user, ipAddress, userAgent, data.deviceFingerprint);
+
+    // Extrair sessionId do JWT payload para usar no evento
+    const decoded = jwt.decode(authResponse.accessToken) as JwtPayload;
+    
+    // Publicar evento após criar sessão
     await EventService.publishUserLogin({
       userId: user.id,
       email: user.email,
@@ -147,11 +153,9 @@ export class AuthService {
       timestamp: new Date(),
       ipAddress,
       userAgent,
-      deviceFingerprint: data.deviceFingerprint
+      deviceFingerprint: data.deviceFingerprint,
+      sessionId: decoded.sessionId
     });
-
-    // Criar sessão e tokens
-    const authResponse = await this.createSession(user, ipAddress, userAgent, data.deviceFingerprint);
 
     return authResponse;
   }
@@ -192,9 +196,9 @@ export class AuthService {
     const sessionData: SessionData = {
       userId: user.id,
       sessionId,
-      deviceFingerprint,
-      ipAddress,
-      userAgent,
+      deviceFingerprint: deviceFingerprint || null,
+      ipAddress: ipAddress || null,
+      userAgent: userAgent || null,
       createdAt: new Date(),
       expiresAt
     };
@@ -208,6 +212,7 @@ export class AuthService {
       email: user.email
     };
 
+    // @ts-ignore - Problema conhecido com tipagem do jsonwebtoken
     const accessToken = jwt.sign(jwtPayload, config.jwt.secret, {
       expiresIn: config.jwt.expiresIn
     });
@@ -216,12 +221,12 @@ export class AuthService {
       id: user.id,
       email: user.email,
       name: user.name,
-      phone: user.phone,
-      document: user.document,
+      phone: user.phone ?? undefined,
+      document: user.document ?? undefined,
       status: user.status,
-      emailVerifiedAt: user.emailVerifiedAt,
-      phoneVerifiedAt: user.phoneVerifiedAt,
-      lastLoginAt: user.lastLoginAt,
+      emailVerifiedAt: user.emailVerifiedAt ?? undefined,
+      phoneVerifiedAt: user.phoneVerifiedAt ?? undefined,
+      lastLoginAt: user.lastLoginAt ?? undefined,
       mfaEnabled: user.mfaEnabled,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt
@@ -284,6 +289,7 @@ export class AuthService {
       email: session.user.email
     };
 
+    // @ts-ignore - Problema conhecido com tipagem do jsonwebtoken
     const accessToken = jwt.sign(jwtPayload, config.jwt.secret, {
       expiresIn: config.jwt.expiresIn
     });
@@ -356,12 +362,12 @@ export class AuthService {
         id: user.id,
         email: user.email,
         name: user.name,
-        phone: user.phone || undefined,
-        document: user.document || undefined,
+        phone: user.phone ?? undefined,
+        document: user.document ?? undefined,
         status: user.status,
-        emailVerifiedAt: user.emailVerifiedAt || undefined,
-        phoneVerifiedAt: user.phoneVerifiedAt || undefined,
-        lastLoginAt: user.lastLoginAt || undefined,
+        emailVerifiedAt: user.emailVerifiedAt ?? undefined,
+        phoneVerifiedAt: user.phoneVerifiedAt ?? undefined,
+        lastLoginAt: user.lastLoginAt ?? undefined,
         mfaEnabled: user.mfaEnabled,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt

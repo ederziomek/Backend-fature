@@ -15,12 +15,12 @@ export interface UserData {
   id: string;
   email: string;
   name: string;
-  phone?: string;
-  document?: string;
+  phone?: string | null;
+  document?: string | null;
   status: string;
-  emailVerifiedAt?: Date;
-  phoneVerifiedAt?: Date;
-  lastLoginAt?: Date;
+  emailVerifiedAt?: Date | null;
+  phoneVerifiedAt?: Date | null;
+  lastLoginAt?: Date | null;
   mfaEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -75,9 +75,9 @@ export interface VerifyEmailRequest {
 export interface SessionData {
   userId: string;
   sessionId: string;
-  deviceFingerprint?: string;
-  ipAddress?: string;
-  userAgent?: string;
+  deviceFingerprint?: string | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
   location?: any;
   createdAt: Date;
   expiresAt: Date;

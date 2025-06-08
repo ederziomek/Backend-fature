@@ -4,6 +4,7 @@ export interface UserCreatedEvent {
   email: string;
   name: string;
   timestamp: Date;
+  metadata?: any;
 }
 
 export interface UserLoginEvent {
@@ -13,6 +14,7 @@ export interface UserLoginEvent {
   timestamp: Date;
   ipAddress?: string;
   userAgent?: string;
+  deviceFingerprint?: string;
   sessionId: string;
 }
 
