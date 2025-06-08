@@ -2,7 +2,7 @@
 // APLICAÇÃO PRINCIPAL - ADMIN SERVICE
 // ===============================================
 
-import Fastify, { FastifyInstance } from 'fastify';
+import Fastify, { FastifyInstance, FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -18,9 +18,13 @@ import { connectRedis, disconnectRedis, checkRedisHealth } from '@/config/redis'
 // Importar rotas
 import { dashboardRoutes } from '@/routes/dashboard.routes';
 import { userManagementRoutes } from '@/routes/user-management.routes';
-import { affiliateManagementRoutes } from '@/routes/affiliate-management.routes';
-import { systemRoutes } from '@/routes/system.routes';
-import { reportsRoutes } from '@/routes/reports.routes';
+
+// Estender interface do FastifyRequest
+declare module 'fastify' {
+  interface FastifyRequest {
+    startTime?: number;
+  }
+}
 
 export class AdminServiceApp {
   private fastify: FastifyInstance;
@@ -45,7 +49,7 @@ export class AdminServiceApp {
   private async registerPlugins(): Promise<void> {
     // CORS
     await this.fastify.register(cors, {
-      origin: adminConfig.security.corsOrigins,
+      origin: true,
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH']
     });
@@ -152,15 +156,6 @@ export class AdminServiceApp {
       
       // Gestão de usuários
       await fastify.register(userManagementRoutes, { prefix: '/api/v1' });
-      
-      // Gestão de afiliados
-      await fastify.register(affiliateManagementRoutes, { prefix: '/api/v1' });
-      
-      // Sistema
-      await fastify.register(systemRoutes, { prefix: '/api/v1' });
-      
-      // Relatórios
-      await fastify.register(reportsRoutes, { prefix: '/api/v1' });
     });
 
     // Health check

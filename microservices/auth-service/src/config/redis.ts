@@ -4,7 +4,6 @@ import { config } from './index';
 // Instância global do Redis
 export const redis = new Redis(config.redis.url, {
   keyPrefix: config.redis.keyPrefix,
-  retryDelayOnFailover: 100,
   maxRetriesPerRequest: 3,
   lazyConnect: true,
 });
