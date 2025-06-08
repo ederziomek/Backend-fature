@@ -15,6 +15,8 @@ import {
 } from '@/types';
 import { AuditService } from './audit.service';
 import { EventService } from './event.service';
+import { EmailService } from './email.service';
+import { TokenService } from './token.service';
 
 export class AuthService {
   /**
@@ -67,6 +69,17 @@ export class AuthService {
       userAgent,
       severity: 'info'
     });
+
+    // Gerar token de verificação de email
+    const verificationToken = await TokenService.createToken(user.id, 'email_verification', 1440); // 24 horas
+
+    // Enviar email de verificação
+    try {
+      await EmailService.sendEmailVerification(user.email, verificationToken, user.name);
+    } catch (error) {
+      console.error('Failed to send verification email:', error);
+      // Não falhar o registro se o email não puder ser enviado
+    }
 
     // Publicar evento
     await EventService.publishUserCreated({
@@ -534,40 +547,183 @@ export class AuthService {
       return;
     }
 
-    // Log de auditoria
-    await AuditService.log({
-      userId: user.id,
-      action: 'user.password_reset_requested',
-      resource: 'user',
-      ipAddress: ipAddress || '',
-      severity: 'info'
-    });
+    try {
+      // Gerar token de reset (expira em 1 hora)
+      const resetToken = await TokenService.createToken(user.id, 'password_reset', 60);
 
-    // Por enquanto, apenas logamos o evento
-    // Em produção, aqui seria enviado um email com link de reset
-    console.log(`Password reset requested for user ${user.email}`);
+      // Enviar email de reset
+      await EmailService.sendPasswordReset(user.email, resetToken, user.name);
+
+      // Log de auditoria
+      await AuditService.log({
+        userId: user.id,
+        action: 'user.password_reset_requested',
+        resource: 'user',
+        details: { email: user.email },
+        ipAddress: ipAddress || '',
+        severity: 'info'
+      });
+
+      // Publicar evento
+      await EventService.publishPasswordResetRequested({
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        resetToken,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hora
+        timestamp: new Date()
+      });
+
+    } catch (error) {
+      console.error('Error in forgotPassword:', error);
+      // Log do erro mas não expor para o usuário
+      await AuditService.log({
+        userId: user.id,
+        action: 'user.password_reset_failed',
+        resource: 'user',
+        details: { error: error instanceof Error ? error.message : 'Unknown error' },
+        ipAddress: ipAddress || '',
+        severity: 'error'
+      });
+    }
   }
 
   /**
    * Redefine a senha usando token de reset
-   * Implementação simplificada - em produção seria usado token real
    */
   static async resetPassword(
     token: string,
     newPassword: string,
     ipAddress?: string
   ): Promise<void> {
-    // Implementação simplificada - em produção validaria token real
-    throw new Error('Funcionalidade de reset de senha será implementada com sistema de email');
+    // Validar e consumir token
+    const tokenValidation = await TokenService.validateAndConsumeToken(token, 'password_reset');
+    
+    if (!tokenValidation.valid) {
+      if (tokenValidation.expired) {
+        throw new Error('Token de reset expirado');
+      }
+      if (tokenValidation.used) {
+        throw new Error('Token de reset já foi utilizado');
+      }
+      throw new Error('Token de reset inválido');
+    }
+
+    const userId = tokenValidation.userId!;
+
+    // Buscar usuário
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      throw new Error('Usuário não encontrado');
+    }
+
+    // Validar nova senha
+    if (newPassword.length < 8) {
+      throw new Error('Nova senha deve ter pelo menos 8 caracteres');
+    }
+
+    // Verificar se nova senha é diferente da atual
+    const isSamePassword = await bcrypt.compare(newPassword, user.passwordHash);
+    if (isSamePassword) {
+      throw new Error('Nova senha deve ser diferente da senha atual');
+    }
+
+    // Hash da nova senha
+    const newPasswordHash = await bcrypt.hash(newPassword, config.security.bcryptRounds);
+
+    // Atualizar senha no banco
+    await prisma.user.update({
+      where: { id: userId },
+      data: { 
+        passwordHash: newPasswordHash,
+        updatedAt: new Date()
+      }
+    });
+
+    // Revogar todas as sessões ativas do usuário
+    await this.logoutAll(userId, ipAddress);
+
+    // Log de auditoria
+    await AuditService.log({
+      userId,
+      action: 'user.password_reset_completed',
+      resource: 'user',
+      details: { email: user.email },
+      ipAddress: ipAddress || '',
+      severity: 'info'
+    });
+
+    // Publicar evento
+    await EventService.publishPasswordResetCompleted({
+      userId,
+      email: user.email,
+      name: user.name,
+      timestamp: new Date()
+    });
   }
 
   /**
    * Verifica email usando token de verificação
-   * Implementação simplificada - em produção seria usado token real
    */
   static async verifyEmail(token: string): Promise<void> {
-    // Implementação simplificada - em produção validaria token real
-    throw new Error('Funcionalidade de verificação de email será implementada com sistema de email');
+    // Validar e consumir token
+    const tokenValidation = await TokenService.validateAndConsumeToken(token, 'email_verification');
+    
+    if (!tokenValidation.valid) {
+      if (tokenValidation.expired) {
+        throw new Error('Token de verificação expirado');
+      }
+      if (tokenValidation.used) {
+        throw new Error('Token de verificação já foi utilizado');
+      }
+      throw new Error('Token de verificação inválido');
+    }
+
+    const userId = tokenValidation.userId!;
+
+    // Buscar usuário
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      throw new Error('Usuário não encontrado');
+    }
+
+    // Verificar se email já foi verificado
+    if (user.emailVerifiedAt) {
+      throw new Error('Email já foi verificado anteriormente');
+    }
+
+    // Marcar email como verificado
+    await prisma.user.update({
+      where: { id: userId },
+      data: { 
+        emailVerifiedAt: new Date(),
+        status: 'active', // Ativar usuário após verificação
+        updatedAt: new Date()
+      }
+    });
+
+    // Log de auditoria
+    await AuditService.log({
+      userId,
+      action: 'user.email_verified',
+      resource: 'user',
+      details: { email: user.email },
+      severity: 'info'
+    });
+
+    // Publicar evento
+    await EventService.publishEmailVerified({
+      userId,
+      email: user.email,
+      name: user.name,
+      timestamp: new Date()
+    });
   }
 
   /**

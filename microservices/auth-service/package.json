@@ -36,12 +36,14 @@
     "@fastify/swagger": "^9.1.0",
     "@fastify/swagger-ui": "^5.0.1",
     "@prisma/client": "^6.1.0",
+    "@types/nodemailer": "^6.4.17",
     "amqplib": "^0.10.8",
     "bcryptjs": "^2.4.3",
     "dotenv": "^16.4.7",
     "fastify": "^5.1.0",
     "ioredis": "^5.4.1",
     "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^7.0.3",
     "prisma": "^6.1.0",
     "redis": "^4.7.0",
     "uuid": "^11.1.0",
@@ -75,4 +77,3 @@
     ]
   }
 }
-
