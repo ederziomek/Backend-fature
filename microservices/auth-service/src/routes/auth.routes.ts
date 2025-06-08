@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { AuthController } from '@/controllers/auth.controller';
 import { authMiddleware, requireEmailVerified, userRateLimit } from '@/middleware/auth.middleware';
+import { ChangePasswordRequest } from '@/types';
 
 /**
  * Rotas de autenticação
@@ -396,7 +397,7 @@ export async function authRoutes(fastify: FastifyInstance) {
     }, AuthController.logoutAll);
 
     // POST /auth/change-password - Alterar senha
-    fastify.post('/change-password', {
+    fastify.post<{ Body: ChangePasswordRequest }>('/change-password', {
       preHandler: [authMiddleware, userRateLimit(5, 15 * 60 * 1000)], // 5 tentativas por 15 minutos
       schema: {
         description: 'Alterar senha do usuário',

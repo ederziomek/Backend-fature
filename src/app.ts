@@ -91,15 +91,6 @@ async function createApp(): Promise<FastifyInstance> {
       schemes: config.server.isDevelopment ? ['http'] : ['https'],
       consumes: ['application/json'],
       produces: ['application/json'],
-      securityDefinitions: {
-        Bearer: {
-          type: 'apiKey',
-          name: 'Authorization',
-          in: 'header',
-          description: 'JWT token. Format: Bearer {token}',
-        },
-      },
-      security: [{ Bearer: [] }],
     },
   });
 
