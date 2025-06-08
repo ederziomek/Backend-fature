@@ -76,7 +76,7 @@ export async function runMigrations(): Promise<void> {
 }
 
 // Eventos do Prisma
-prisma.$on('query', (e) => {
+prisma.$on('query', (e: any) => {
   if (adminConfig.server.nodeEnv === 'development') {
     console.log('Query: ' + e.query);
     console.log('Params: ' + e.params);
@@ -84,15 +84,15 @@ prisma.$on('query', (e) => {
   }
 });
 
-prisma.$on('info', (e) => {
+prisma.$on('info', (e: any) => {
   console.log('Info: ' + e.message);
 });
 
-prisma.$on('warn', (e) => {
+prisma.$on('warn', (e: any) => {
   console.warn('Warning: ' + e.message);
 });
 
-prisma.$on('error', (e) => {
+prisma.$on('error', (e: any) => {
   console.error('Error: ' + e.message);
 });
 
