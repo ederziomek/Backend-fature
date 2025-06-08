@@ -34,7 +34,6 @@ async function main(): Promise<void> {
     create: {
       userId: adminUser.id,
       referralCode: 'ADMIN001',
-      category: 'diamond',
       level: 0,
       status: 'active',
       totalReferrals: 0,
@@ -56,7 +55,6 @@ async function main(): Promise<void> {
       phone: '+5511888888888',
       document: '11111111111',
       referralCode: 'TEST001',
-      category: 'standard' as const,
     },
     {
       email: 'afiliado2@teste.com',
@@ -64,7 +62,6 @@ async function main(): Promise<void> {
       phone: '+5511777777777',
       document: '22222222222',
       referralCode: 'TEST002',
-      category: 'premium' as const,
     },
     {
       email: 'afiliado3@teste.com',
@@ -72,7 +69,6 @@ async function main(): Promise<void> {
       phone: '+5511666666666',
       document: '33333333333',
       referralCode: 'TEST003',
-      category: 'vip' as const,
     },
   ];
 
@@ -102,7 +98,6 @@ async function main(): Promise<void> {
         userId: user.id,
         parentId: adminAffiliate.id, // Todos são filhos do admin
         referralCode: userData.referralCode,
-        category: userData.category,
         level: 1,
         status: 'active',
         totalReferrals: 0,
