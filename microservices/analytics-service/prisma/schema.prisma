@@ -1,0 +1,307 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum ReportType {
+  AFFILIATE_PERFORMANCE
+  OFFER_PERFORMANCE
+  CONVERSION_ANALYSIS
+  REVENUE_ANALYSIS
+  TRAFFIC_ANALYSIS
+  COMMISSION_REPORT
+  CUSTOM_REPORT
+}
+
+enum MetricType {
+  CLICKS
+  CONVERSIONS
+  REVENUE
+  COMMISSIONS
+  CONVERSION_RATE
+  EPC
+  CTR
+  AOV
+}
+
+enum TimeRange {
+  LAST_24H
+  LAST_7D
+  LAST_30D
+  LAST_90D
+  LAST_YEAR
+  CUSTOM
+}
+
+enum ReportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+enum ChartType {
+  LINE
+  BAR
+  PIE
+  DOUGHNUT
+  AREA
+  SCATTER
+  HEATMAP
+  TABLE
+}
+
+enum AggregationLevel {
+  HOUR
+  DAY
+  WEEK
+  MONTH
+  YEAR
+}
+
+// Analytics Reports
+model AnalyticsReport {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  type        ReportType
+  status      ReportStatus @default(PENDING)
+  
+  // Report Configuration
+  timeRange   TimeRange
+  startDate   DateTime
+  endDate     DateTime
+  filters     Json         @default("{}")
+  parameters  Json         @default("{}")
+  
+  // Report Data
+  data        Json?
+  charts      Json?
+  metadata    Json?
+  
+  // File Information
+  fileUrl     String?
+  fileSize    Int?
+  format      String?
+  
+  // Timestamps
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  expiresAt   DateTime?
+  
+  // Relations
+  createdBy   String
+  dashboards  AnalyticsDashboard[]
+  
+  @@map("analytics_reports")
+}
+
+// Analytics Metrics (Aggregated Data)
+model AnalyticsMetric {
+  id            String           @id @default(cuid())
+  
+  // Metric Identification
+  type          MetricType
+  name          String
+  description   String?
+  
+  // Time Dimension
+  date          DateTime
+  hour          Int?
+  aggregation   AggregationLevel @default(DAY)
+  
+  // Dimensions
+  affiliateId   String?
+  offerId       String?
+  country       String?
+  device        String?
+  source        String?
+  
+  // Metric Values
+  value         Float
+  count         Int?
+  percentage    Float?
+  
+  // Additional Data
+  metadata      Json?
+  
+  // Timestamps
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  
+  @@unique([type, date, aggregation, affiliateId, offerId])
+  @@index([type, date])
+  @@index([affiliateId, date])
+  @@index([offerId, date])
+  @@map("analytics_metrics")
+}
+
+// Analytics Dashboards
+model AnalyticsDashboard {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  
+  // Dashboard Configuration
+  widgets     Json     @default("[]")
+  layout      Json     @default("{}")
+  filters     Json     @default("{}")
+  
+  // Access Control
+  isPublic    Boolean  @default(false)
+  tags        String[] @default([])
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  createdBy   String
+  reports     AnalyticsReport[]
+  
+  @@map("analytics_dashboards")
+}
+
+// Real-time Analytics Cache
+model AnalyticsCache {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  data      Json
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  @@index([key])
+  @@index([expiresAt])
+  @@map("analytics_cache")
+}
+
+// Analytics Alerts
+model AnalyticsAlert {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  
+  // Alert Configuration
+  metric       MetricType
+  condition    String   // e.g., "greater_than", "less_than", "percentage_change"
+  threshold    Float
+  timeWindow   Int      // in minutes
+  
+  // Alert State
+  isActive     Boolean  @default(true)
+  lastTriggered DateTime?
+  triggerCount Int      @default(0)
+  
+  // Notification Settings
+  notifyEmails String[] @default([])
+  notifySlack  Boolean  @default(false)
+  
+  // Timestamps
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  // Relations
+  createdBy    String
+  
+  @@map("analytics_alerts")
+}
+
+// Analytics Sessions (for real-time tracking)
+model AnalyticsSession {
+  id          String   @id @default(cuid())
+  sessionId   String   @unique
+  
+  // Session Data
+  affiliateId String?
+  offerId     String?
+  country     String?
+  device      String?
+  userAgent   String?
+  ipAddress   String?
+  
+  // Activity Tracking
+  clicks      Int      @default(0)
+  conversions Int      @default(0)
+  revenue     Float    @default(0)
+  
+  // Timestamps
+  startedAt   DateTime @default(now())
+  lastActivity DateTime @default(now())
+  endedAt     DateTime?
+  
+  @@index([affiliateId])
+  @@index([startedAt])
+  @@map("analytics_sessions")
+}
+
+// Analytics Exports
+model AnalyticsExport {
+  id          String       @id @default(cuid())
+  name        String
+  type        String       // pdf, excel, csv
+  status      ReportStatus @default(PENDING)
+  
+  // Export Configuration
+  reportId    String?
+  dashboardId String?
+  parameters  Json         @default("{}")
+  
+  // File Information
+  fileUrl     String?
+  fileSize    Int?
+  downloadCount Int        @default(0)
+  
+  // Timestamps
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  expiresAt   DateTime?
+  
+  // Relations
+  createdBy   String
+  
+  @@map("analytics_exports")
+}
+
+// Analytics Configuration
+model AnalyticsConfig {
+  id                String   @id @default(cuid())
+  key               String   @unique
+  value             Json
+  description       String?
+  isSystem          Boolean  @default(false)
+  
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@map("analytics_config")
+}
+
+// Data Retention Policies
+model AnalyticsRetention {
+  id            String   @id @default(cuid())
+  dataType      String   // metrics, reports, cache, etc.
+  retentionDays Int
+  isActive      Boolean  @default(true)
+  
+  // Cleanup Configuration
+  lastCleanup   DateTime?
+  nextCleanup   DateTime?
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([dataType])
+  @@map("analytics_retention")
+}
+
