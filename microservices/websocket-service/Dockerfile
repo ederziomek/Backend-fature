@@ -16,7 +16,7 @@ COPY . .
 RUN npm run build
 
 # Expor porta
-EXPOSE 3008
+EXPOSE 3011
 
 # Comando para iniciar o serviço
 CMD ["npm", "start"]

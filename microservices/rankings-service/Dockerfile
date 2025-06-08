@@ -1,4 +1,4 @@
-# Dockerfile para Performance Service
+# Dockerfile para Rankings Service
 FROM node:18-alpine
 
 WORKDIR /app
@@ -16,7 +16,7 @@ COPY . .
 RUN npm run build
 
 # Expor porta
-EXPOSE 3012
+EXPOSE 3010
 
 # Comando para iniciar o serviço
 CMD ["npm", "start"]

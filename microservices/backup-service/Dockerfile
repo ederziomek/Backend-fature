@@ -22,7 +22,7 @@ RUN npm run build
 RUN mkdir -p /app/backups
 
 # Expor porta
-EXPOSE 3009
+EXPOSE 3013
 
 # Comando para iniciar o serviço
 CMD ["npm", "start"]
