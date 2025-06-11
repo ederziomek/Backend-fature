@@ -472,3 +472,146 @@ model Referral {
 // Os índices básicos são criados automaticamente pelo Prisma para chaves primárias e únicas
 // Índices customizados podem ser adicionados conforme necessário
 
+
+
+// Novas tabelas para configurações centralizadas
+model Configuration {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  section   String   @db.VarChar(100)
+  key       String   @db.VarChar(200)
+  value     Json
+  version   String   @db.VarChar(50)
+  createdBy String   @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relacionamentos
+  history   ConfigurationHistory[]
+
+  @@unique([section, key])
+  @@map("configurations")
+}
+
+model ConfigurationHistory {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  configurationId String    @map("configuration_id") @db.Uuid
+  section         String    @db.VarChar(100)
+  key             String    @db.VarChar(200)
+  oldValue        Json?     @map("old_value")
+  newValue        Json      @map("new_value")
+  version         String    @db.VarChar(50)
+  changedBy       String    @map("changed_by") @db.Uuid
+  changedAt       DateTime  @default(now()) @map("changed_at")
+  reason          String?   @db.Text
+  approved        Boolean   @default(false)
+  approvedBy      String?   @map("approved_by") @db.Uuid
+  approvedAt      DateTime? @map("approved_at")
+
+  // Relacionamentos
+  configuration   Configuration @relation(fields: [configurationId], references: [id], onDelete: Cascade)
+
+  @@map("configuration_history")
+}
+
+// Novas tabelas para gamificação expandida
+model DailyIndication {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  affiliateId       String    @map("affiliate_id") @db.Uuid
+  cycleStartDate    DateTime  @map("cycle_start_date") @db.Date
+  currentDay        Int       @map("current_day")
+  completedDays     Boolean[] @map("completed_days")
+  totalEarned       Decimal   @default(0) @map("total_earned") @db.Decimal(10, 2)
+  cycleCompleted    Boolean   @default(false) @map("cycle_completed")
+  lastIndicationDate DateTime? @map("last_indication_date")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  // Relacionamentos
+  affiliate         Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  @@unique([affiliateId, cycleStartDate])
+  @@map("daily_indications")
+}
+
+model WeeklyGoal {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  affiliateId       String    @map("affiliate_id") @db.Uuid
+  weekStartDate     DateTime  @map("week_start_date") @db.Date
+  silverGoal        Int       @map("silver_goal")
+  silverReward      Decimal   @map("silver_reward") @db.Decimal(10, 2)
+  silverCompleted   Boolean   @default(false) @map("silver_completed")
+  silverCompletedAt DateTime? @map("silver_completed_at")
+  goldGoal          Int       @map("gold_goal")
+  goldReward        Decimal   @map("gold_reward") @db.Decimal(10, 2)
+  goldCompleted     Boolean   @default(false) @map("gold_completed")
+  goldCompletedAt   DateTime? @map("gold_completed_at")
+  sapphireGoal      Int       @map("sapphire_goal")
+  sapphireReward    Decimal   @map("sapphire_reward") @db.Decimal(10, 2)
+  sapphireCompleted Boolean   @default(false) @map("sapphire_completed")
+  sapphireCompletedAt DateTime? @map("sapphire_completed_at")
+  diamondGoal       Int       @map("diamond_goal")
+  diamondReward     Decimal   @map("diamond_reward") @db.Decimal(10, 2)
+  diamondCompleted  Boolean   @default(false) @map("diamond_completed")
+  diamondCompletedAt DateTime? @map("diamond_completed_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  // Relacionamentos
+  affiliate         Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  @@unique([affiliateId, weekStartDate])
+  @@map("weekly_goals")
+}
+
+model AffiliateProgression {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  affiliateId   String   @map("affiliate_id") @db.Uuid
+  oldCategory   AffiliateCategory? @map("old_category")
+  newCategory   AffiliateCategory  @map("new_category")
+  oldLevel      Int?     @map("old_level")
+  newLevel      Int      @map("new_level")
+  bonificationAmount Decimal? @map("bonification_amount") @db.Decimal(10, 2)
+  progressionDate DateTime @default(now()) @map("progression_date")
+
+  // Relacionamentos
+  affiliate     Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  @@map("affiliate_progressions")
+}
+
+model PotentialAnalysis {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  affiliateId         String   @map("affiliate_id") @db.Uuid
+  historicalAverage   Decimal  @map("historical_average") @db.Decimal(10, 2)
+  trendDirection      String   @map("trend_direction") @db.VarChar(10)
+  seasonalityFactor   Decimal  @map("seasonality_factor") @db.Decimal(5, 3)
+  confidenceLevel     Decimal  @map("confidence_level") @db.Decimal(5, 3)
+  recommendedGoals    Json     @map("recommended_goals")
+  analysisDate        DateTime @default(now()) @map("analysis_date")
+
+  // Relacionamentos
+  affiliate           Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  @@map("potential_analysis")
+}
+
+model WeeklyData {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  affiliateId     String   @map("affiliate_id") @db.Uuid
+  weekStartDate   DateTime @map("week_start_date") @db.Date
+  totalIndications Int     @map("total_indications")
+  validIndications Int     @map("valid_indications")
+  revenue         Decimal  @map("revenue") @db.Decimal(15, 2)
+  conversionRate  Decimal  @map("conversion_rate") @db.Decimal(5, 4)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  // Relacionamentos
+  affiliate       Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  @@unique([affiliateId, weekStartDate])
+  @@map("weekly_data")
+}
+
+// Alterações em tabelas existentes - adicionar campos necessários
+// Nota: Estas alterações devem ser feitas via migration
+
