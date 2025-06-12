@@ -1,16 +1,17 @@
 # Dockerfile para Backup Service
-FROM node:18-alpine
-
-# Instalar dependências do sistema para backup
-RUN apk add --no-cache postgresql-client gzip tar
+FROM node:20-alpine
 
 WORKDIR /app
+
+# Instalar dependências do sistema necessárias
+RUN apk add --no-cache python3 make g++
 
 # Copiar package.json e package-lock.json
 COPY package*.json ./
 
-# Instalar dependências
-RUN npm ci --only=production
+# Limpar cache do npm e instalar dependências
+RUN npm cache clean --force && \
+    npm ci --only=production --no-audit --no-fund
 
 # Copiar código fonte
 COPY . .
@@ -18,12 +19,8 @@ COPY . .
 # Compilar TypeScript
 RUN npm run build
 
-# Criar diretório de backups
-RUN mkdir -p /app/backups
-
 # Expor porta
 EXPOSE 3013
 
 # Comando para iniciar o serviço
 CMD ["npm", "start"]
-
