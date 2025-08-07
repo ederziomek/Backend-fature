@@ -19,6 +19,8 @@ import { testRoutes } from '@/routes/test';
 import { transactionsRoutes } from '@/routes/transactions';
 import { commissionsRoutes } from '@/routes/commissions';
 import { gamificationRoutes } from '@/routes/gamification';
+import { affiliateAnalysisRoutes } from '@/routes/affiliate-analysis';
+import performanceAnalysisRoutes from '@/routes/performance-analysis';
 
 // Tipos
 import '@/types/fastify';
@@ -112,6 +114,8 @@ async function createApp(): Promise<FastifyInstance> {
   await app.register(transactionsRoutes, { prefix: '/api/transactions' });
   await app.register(commissionsRoutes, { prefix: '/api/commissions' });
   await app.register(gamificationRoutes, { prefix: '/api/gamification' });
+  await app.register(affiliateAnalysisRoutes, { prefix: '/api/affiliate-analysis' });
+  await app.register(performanceAnalysisRoutes);
 
   // Health check endpoint
   app.get('/health', {
